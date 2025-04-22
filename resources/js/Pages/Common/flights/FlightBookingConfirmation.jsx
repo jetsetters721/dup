@@ -21,6 +21,7 @@ export default function FlightBookingConfirmation() {
   const { bookingId } = useParams();
   const [bookingDetails, setBookingDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [passengerData, setPassengerData] = useState([]);
@@ -28,10 +29,13 @@ export default function FlightBookingConfirmation() {
   const [vipService, setVipService] = useState(false);
   const [calculatedFare, setCalculatedFare] = useState({
     baseFare: 0,
-    tax: 0,
+    countryTax: 0,
+    platformFee: 0,
+    totalTax: 0,
     addonsTotal: 0,
     vipServiceFee: 0,
-    totalAmount: 0
+    totalAmount: 0,
+    currency: 'EUR'
   });
   const [expandedSections, setExpandedSections] = useState({
     flightDetails: true,
@@ -111,7 +115,127 @@ export default function FlightBookingConfirmation() {
     return flightBookingData.bookings[0];
   };
 
-  // Fetch booking details from data source (API or mock)
+  // Transform flight data from search page to booking format
+  const transformFlightData = (flightData) => {
+    if (!flightData) return null;
+
+    // Calculate base price
+    const basePrice = parseFloat(flightData.price.base) || 0;
+
+    // Calculate platform fee (10% of base price)
+    const platformFee = basePrice * 0.10;
+
+    // Calculate country-specific taxes based on departure country
+    // Default tax rate is 5% if country-specific rate is not available
+    const countryTaxRates = {
+      'US': 0.075,  // 7.5%
+      'GB': 0.20,   // 20% VAT
+      'FR': 0.20,   // 20% VAT
+      'DE': 0.19,   // 19% VAT
+      'IN': 0.18,   // 18% GST
+      // Add more countries as needed
+    };
+
+    // Get country code from departure airport or default to standard rate
+    const departureCountry = flightData.departure.country || 'IN';
+    const taxRate = countryTaxRates[departureCountry] || 0.05;
+    const countryTax = basePrice * taxRate;
+
+    // Calculate total taxes including country tax and platform fee
+    const totalTaxes = countryTax + platformFee;
+
+    return {
+      bookingId: bookingId || `BOOK-${Date.now()}`,
+      flight: {
+        airline: flightData.airline.name,
+        flightNumber: `${flightData.airline.code} ${flightData.id}`,
+        departureCity: flightData.departure.airport,
+        arrivalCity: flightData.arrival.airport,
+        departureTime: flightData.departure.time,
+        arrivalTime: flightData.arrival.time,
+        duration: flightData.duration,
+        departureDate: flightData.departure.date,
+        arrivalDate: flightData.arrival.date,
+        cabin: flightData.cabin,
+        fareType: flightData.class,
+        stops: flightData.stops,
+        basePrice: basePrice,
+        tax: totalTaxes,
+        platformFee: platformFee,
+        countryTax: countryTax,
+        totalPrice: basePrice + totalTaxes,
+        departureAirport: `${flightData.departure.airport} Terminal ${flightData.departure.terminal}`,
+        arrivalAirport: `${flightData.arrival.airport} Terminal ${flightData.arrival.terminal}`,
+        segments: flightData.segments.map(segment => ({
+          departure: {
+            airport: segment.departure.airport,
+            terminal: segment.departure.terminal,
+            time: segment.departure.time
+          },
+          arrival: {
+            airport: segment.arrival.airport,
+            terminal: segment.arrival.terminal,
+            time: segment.arrival.time
+          },
+          duration: segment.duration,
+          aircraft: segment.aircraft || 'Unknown',
+          carrier: flightData.airline.code,
+          number: segment.flightNumber
+        })),
+        price: {
+          base: basePrice,
+          platformFee: platformFee,
+          countryTax: countryTax,
+          totalTaxes: totalTaxes,
+          total: basePrice + totalTaxes,
+          currency: flightData.price.currency || 'EUR'
+        }
+      },
+      baggage: {
+        cabin: flightData.baggage.cabin,
+        checkIn: flightData.baggage.checked
+      },
+      passengers: [],
+      contact: {
+        email: "",
+        phone: ""
+      },
+      addOns: [
+        {
+          id: 1,
+          name: "Travel Insurance",
+          title: "Travel Insurance",
+          description: "Comprehensive coverage for your journey",
+          price: 25,
+          popular: true,
+          selected: false,
+          benefits: [
+            "Trip cancellation coverage",
+            "Medical emergency coverage",
+            "Lost baggage protection"
+          ]
+        },
+        {
+          id: 2,
+          name: "Airport Transfer",
+          title: "Airport Transfer",
+          description: "Comfortable ride to/from your accommodation",
+          price: 35,
+          popular: false,
+          selected: false,
+          benefits: [
+            "24/7 service availability",
+            "Professional drivers",
+            "Free waiting time"
+          ]
+        }
+      ],
+      vipServiceFee: 30,
+      isInternational: flightData.departure.airport !== flightData.arrival.airport
+    };
+  };
+
+  // Fetch booking details
   useEffect(() => {
     setLoading(true);
     
@@ -119,219 +243,79 @@ export default function FlightBookingConfirmation() {
       try {
         let bookingData;
         
-        // First check if booking data was passed from search results page
-        if (location.state?.bookingData) {
-          console.log("Using booking data from search page", location.state.bookingData);
-          bookingData = location.state.bookingData;
-        } 
-        // Otherwise try to fetch from API or use mock data
-        else {
-          if (USE_AMADEUS_API && bookingId) {
-            console.log("Fetching booking data from Amadeus API");
-            bookingData = await fetchBookingFromApi(bookingId);
-          } else {
-            console.log("Using mock booking data");
-            // Find booking by ID or use the first one by default
-            bookingData = flightBookingData.bookings.find(b => b.bookingId === bookingId) || 
-                         flightBookingData.internationalBookings.find(b => b.bookingId === bookingId);
-                        
-            // If no booking found by ID, use the first booking as default
-            if (!bookingData) {
-              bookingData = flightBookingData.bookings[0];
-            }
-          }
+        // Check if flight data was passed from search page
+        if (location.state?.flightData) {
+          console.log("Using flight data from search page", location.state.flightData);
+          bookingData = transformFlightData(location.state.flightData);
+        } else {
+          setError("No flight data available. Please return to the search page and try again.");
+          return;
         }
         
+        if (!bookingData) {
+          throw new Error("Failed to process flight data");
+        }
+
         setBookingDetails(bookingData);
-        setPassengerData([...bookingData.passengers]);
-        updateFareSummary(bookingData.passengers.length, bookingData);
+        // Initialize with 1 passenger if none exist
+        const initialPassengerCount = Math.max(1, passengerData.length);
+        updateFareSummary(initialPassengerCount, bookingData);
       } catch (error) {
         console.error("Error getting booking details:", error);
-        // Fallback to mock data
-        const fallbackData = flightBookingData.bookings[0];
-        setBookingDetails(fallbackData);
-        setPassengerData([...fallbackData.passengers]);
-        updateFareSummary(fallbackData.passengers.length, fallbackData);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
     };
     
     getBookingDetails();
-  }, [bookingId, location.state]);
+  }, [location.state, bookingId]);
 
-  useEffect(() => {
-    // If booking details were passed via navigation state
-    if (location.state && location.state.bookingDetails) {
-      console.log("Received booking details:", location.state.bookingDetails);
-      
-      // Create a more complete booking details object
-      const flightData = location.state.bookingDetails.flight || {};
-      const numPassengers = location.state.bookingDetails.passengers || 1;
-      
-      // Extract fare details
-      const baseFare = flightData.basePrice || 450;
-      const taxAmount = flightData.tax || Math.round(baseFare * 0.18);
-      const totalPerPassenger = baseFare + taxAmount;
-      const totalAmount = totalPerPassenger * numPassengers;
-      
-      // Create a complete booking details object with proper defaults
-      const enhancedBookingDetails = {
-        ...location.state.bookingDetails,
-        flight: {
-          ...flightData,
-          airline: flightData.airline || 'Qatar Airways',
-          flightNumber: flightData.flightNumber || 'QR 4771',
-          departureCity: flightData.departureCity || 'Dubai',
-          arrivalCity: flightData.arrivalCity || 'Doha',
-          departureTime: flightData.departureTime || '10:00',
-          arrivalTime: flightData.arrivalTime || '12:00',
-          duration: flightData.duration || 'PT20H20M',
-          departureDate: flightData.departureDate || new Date().toISOString(),
-          arrivalDate: flightData.arrivalDate || new Date().toISOString(),
-          cabin: flightData.cabin || 'Economy',
-          fareType: flightData.fareType || 'Standard',
-          stops: flightData.stops || '1',
-          basePrice: baseFare,
-          tax: taxAmount,
-          totalPrice: totalAmount,
-          departureAirport: flightData.departureAirport || 'Dubai International Airport (DXB)',
-          arrivalAirport: flightData.arrivalAirport || 'Hamad International Airport (DOH)'
-        },
-        baggage: {
-          cabin: { weight: 0, weightUnit: 'KG' },
-          checkIn: { weight: 23, weightUnit: 'KG' }
-        },
-        contact: {
-          email: "guest@jetsetter.com",
-          phone: "+1 123-456-7890"
-        },
-        addOns: [
-          {
-            id: 1,
-            name: "Travel Insurance",
-            title: "Travel Insurance",
-            description: "Comprehensive coverage for your journey",
-            price: 25,
-            popular: true,
-            selected: false,
-            benefits: [
-              "Trip cancellation coverage",
-              "Medical emergency coverage",
-              "Lost baggage protection"
-            ]
-          },
-          {
-            id: 2,
-            name: "Airport Transfer",
-            title: "Airport Transfer",
-            description: "Comfortable ride to/from your accommodation",
-            price: 35,
-            popular: false,
-            selected: false,
-            benefits: [
-              "24/7 service availability",
-              "Professional drivers",
-              "Free waiting time"
-            ]
-          }
-        ],
-        vipServiceFee: 30,
-        isInternational: flightData.departureCity !== flightData.arrivalCity,
-        visaRequirements: {
-          destination: flightData.arrivalCity,
-          visaType: "Tourist/Business",
-          processingTime: "3-5 business days",
-          requirements: [
-            "Valid passport with at least 6 months validity",
-            "Completed visa application form",
-            "Recent passport-sized photographs",
-            "Proof of accommodation"
-          ],
-          officialWebsite: "https://visa.gov.example"
-        }
-      };
-      
-      setBookingDetails(enhancedBookingDetails);
-      
-      // Generate passenger data based on number of passengers
-      const newPassengerData = Array.from({ length: numPassengers }, (_, i) => ({
-        id: i,
-        title: "",
-        firstName: "",
-        lastName: "",
-        dateOfBirth: "",
-        passport: "",
-        passportExpiry: "",
-        nationality: "",
-        meal: "Regular",
-        seat: "",
-        isComplete: false
-      }));
-      setPassengerData(newPassengerData);
-      
-      // Set fare details
-      setCalculatedFare({
-        baseFare,
-        tax: taxAmount,
-        addonsTotal: 0,
-        vipServiceFee: 0,
-        totalAmount: totalAmount
-      });
-      
-      setLoading(false);
-    } else if (bookingId) {
-      // If booking ID was provided via URL params
-      fetchBookingDetails(bookingId);
-    } else {
-      // Generate demo booking data if no actual data available
-      generateDemoBookingData();
-    }
-  }, [location, bookingId]);
-
-  // Calculate and update fare summary based on selections
-  const updateFareSummary = (passengerCount, bookingData = bookingDetails) => {
-    if (!bookingData) return;
-    
-    // Calculate base fare and tax
-    const baseFare = bookingData.flight.basePrice * passengerCount;
-    const tax = bookingData.flight.tax * passengerCount;
-    
-    // Calculate add-ons cost
-    let addonsTotal = 0;
-    if (selectedAddons.length > 0) {
-      bookingData.addOns.forEach(addon => {
-        if (selectedAddons.includes(addon.id)) {
-          if (addon.perTraveller) {
-            addonsTotal += addon.price * passengerCount;
-          } else {
-            addonsTotal += addon.price;
-          }
-        }
-      });
-    }
-    
-    // Add VIP service fee if selected (convert from USD to INR for display)
-    const vipServiceFee = vipService ? bookingData.vipServiceFee * 84 : 0; // Approximate USD to INR conversion
-    
-    // Calculate total amount
-    const totalAmount = baseFare + tax + addonsTotal + vipServiceFee;
-    
-    setCalculatedFare({
-      baseFare,
-      tax,
-      addonsTotal,
-      vipServiceFee,
-      totalAmount
-    });
-  };
-
-  // Effect to recalculate fare when changes are made
+  // Add an effect to update fare when passengers, addons, or VIP service changes
   useEffect(() => {
     if (bookingDetails) {
       updateFareSummary(passengerData.length);
     }
-  }, [selectedAddons, vipService, passengerData.length]);
+  }, [passengerData.length, selectedAddons, vipService]);
+
+  // Update fare summary when passenger count or booking details change
+  const updateFareSummary = (passengerCount, bookingData = bookingDetails) => {
+    if (!bookingData || !bookingData.flight || !bookingData.flight.price) return;
+
+    // Get base fare from flight data
+    const baseFare = parseFloat(bookingData.flight.price.base) || 0;
+    
+    // Get taxes and platform fee
+    const countryTax = bookingData.flight.price.countryTax || 0;
+    const platformFee = bookingData.flight.price.platformFee || 0;
+    const totalTaxes = bookingData.flight.price.totalTaxes || 0;
+    
+    // Calculate add-ons total
+    const addonsTotal = selectedAddons.reduce((sum, addonId) => {
+      const addon = bookingData.addOns.find(a => a.id === addonId);
+      return sum + (addon ? addon.price : 0);
+    }, 0);
+
+    // Calculate VIP service fee if selected
+    const vipServiceFee = vipService ? (bookingData.vipServiceFee || 0) : 0;
+    
+    // Calculate per passenger costs (minimum 1 passenger)
+    const effectivePassengerCount = Math.max(1, passengerCount);
+    const totalBaseFare = baseFare * effectivePassengerCount;
+    const totalTax = totalTaxes * effectivePassengerCount;
+    const totalAmount = totalBaseFare + totalTax + addonsTotal + vipServiceFee;
+
+    setCalculatedFare({
+      baseFare: totalBaseFare,
+      countryTax: countryTax * effectivePassengerCount,
+      platformFee: platformFee * effectivePassengerCount,
+      totalTax: totalTax,
+      addonsTotal,
+      vipServiceFee,
+      totalAmount,
+      currency: bookingData.flight.price.currency || 'EUR'
+    });
+  };
 
   const toggleSection = (section) => {
     setExpandedSections({
@@ -435,14 +419,20 @@ export default function FlightBookingConfirmation() {
 
   // Handle addon selection
   const toggleAddon = (addonId) => {
+    const addon = bookingDetails.addOns.find(a => a.id === addonId);
+    if (!addon) return;
+
     let newSelectedAddons;
     if (selectedAddons.includes(addonId)) {
       newSelectedAddons = selectedAddons.filter(id => id !== addonId);
     } else {
-      // If selecting an addon, remove any other addons (assuming they're mutually exclusive)
-      newSelectedAddons = [addonId];
+      newSelectedAddons = [...selectedAddons, addonId];
     }
     setSelectedAddons(newSelectedAddons);
+    
+    // Update fare summary after toggling addon
+    const passengerCount = passengerData.length || 1;
+    updateFareSummary(passengerCount, bookingDetails);
   };
   
   // Toggle VIP service
@@ -479,6 +469,105 @@ export default function FlightBookingConfirmation() {
     });
   };
 
+  const renderAddon = (addon) => (
+    <div key={addon.id} className="flex justify-between items-start p-4 border rounded-lg mb-4">
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-800">{addon.name}</h3>
+        <p className="text-sm text-gray-600 mt-1">{addon.description}</p>
+        <ul className="mt-2 space-y-1">
+          {addon.benefits.map((benefit, index) => (
+            <li key={index} className="flex items-center text-sm text-gray-600">
+              <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {benefit}
+            </li>
+          ))}
+        </ul>
+        <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">
+          Know More
+        </button>
+      </div>
+      <div className="text-right">
+        <div className="text-gray-600 text-sm">
+          {calculatedFare.currency} {addon.price.toFixed(2)}
+        </div>
+        <button 
+          onClick={() => toggleAddon(addon.id)}
+          className={`mt-2 ${selectedAddons.includes(addon.id) ? 'bg-green-600' : 'bg-blue-600'} text-white px-4 py-1 rounded hover:opacity-90 transition-colors text-sm`}
+        >
+          {selectedAddons.includes(addon.id) ? 'Added' : 'Add'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Update the JSX where fare summary is displayed
+  const renderFareSummary = () => (
+    <div className="space-y-3">
+      {/* Base Fare */}
+      <div className="flex justify-between items-center text-sm">
+        <div>
+          Base Fare
+          <span className="text-xs text-gray-500 ml-1">
+            ({passengerData.length || 1} {(passengerData.length || 1) > 1 ? 'Travelers' : 'Traveler'})
+          </span>
+        </div>
+        <div className="font-medium">
+          {calculatedFare.currency} {calculatedFare.baseFare.toFixed(2)}
+        </div>
+      </div>
+      
+      {/* Country Tax */}
+      <div className="flex justify-between items-center text-sm">
+        <div>
+          Country Tax
+          <span className="text-xs text-gray-500 ml-1">
+            ({passengerData.length || 1} {(passengerData.length || 1) > 1 ? 'Travelers' : 'Traveler'})
+          </span>
+        </div>
+        <div className="font-medium">
+          {calculatedFare.currency} {calculatedFare.countryTax.toFixed(2)}
+        </div>
+      </div>
+
+      {/* Platform Fee */}
+      <div className="flex justify-between items-center text-sm">
+        <div>
+          Platform Fee (10%)
+          <span className="text-xs text-gray-500 ml-1">
+            ({passengerData.length || 1} {(passengerData.length || 1) > 1 ? 'Travelers' : 'Traveler'})
+          </span>
+        </div>
+        <div className="font-medium">
+          {calculatedFare.currency} {calculatedFare.platformFee.toFixed(2)}
+        </div>
+      </div>
+      
+      {/* Add-ons if any */}
+      {calculatedFare.addonsTotal > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <div>Add-Ons</div>
+          <div className="font-medium">{calculatedFare.currency} {calculatedFare.addonsTotal.toFixed(2)}</div>
+        </div>
+      )}
+      
+      {/* VIP Service if selected */}
+      {calculatedFare.vipServiceFee > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <div>VIP Service</div>
+          <div className="font-medium">{calculatedFare.currency} {calculatedFare.vipServiceFee.toFixed(2)}</div>
+        </div>
+      )}
+      
+      {/* Total */}
+      <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-bold text-lg">
+        <div>Total</div>
+        <div>{calculatedFare.currency} {calculatedFare.totalAmount.toFixed(2)}</div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -511,61 +600,7 @@ export default function FlightBookingConfirmation() {
               <div className="p-8 border-t border-gray-300">
                 <h3 className="font-bold text-xl mb-4">Fare Summary</h3>
                 
-                <div className="space-y-3">
-                  {/* Base Fare */}
-                  <div className="flex justify-between items-center text-sm">
-                    <div>
-                      Base Fare
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({bookingDetails?.passengers || passengerData.length} {(bookingDetails?.passengers || passengerData.length) > 1 ? 'Travelers' : 'Traveler'})
-                      </span>
-                    </div>
-                    <div className="font-medium">
-                      ${calculatedFare.baseFare * (bookingDetails?.passengers || passengerData.length)}
-                    </div>
-                  </div>
-                  
-                  {/* Taxes & Fees */}
-                  <div className="flex justify-between items-center text-sm">
-                    <div>
-                      Taxes & Fees
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({bookingDetails?.passengers || passengerData.length} {(bookingDetails?.passengers || passengerData.length) > 1 ? 'Travelers' : 'Traveler'})
-                      </span>
-                    </div>
-                    <div className="font-medium">
-                      ${calculatedFare.tax * (bookingDetails?.passengers || passengerData.length)}
-                    </div>
-                  </div>
-                  
-                  {/* Add-ons if any */}
-                  {calculatedFare.addonsTotal > 0 && (
-                    <div className="flex justify-between items-center text-sm">
-                      <div>Add-Ons</div>
-                      <div className="font-medium">${calculatedFare.addonsTotal}</div>
-                    </div>
-                  )}
-                  
-                  {/* VIP Service if selected */}
-                  {calculatedFare.vipServiceFee > 0 && (
-                    <div className="flex justify-between items-center text-sm">
-                      <div>VIP Service</div>
-                      <div className="font-medium">${calculatedFare.vipServiceFee}</div>
-                    </div>
-                  )}
-                  
-                  {/* Total */}
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-bold text-lg">
-                    <div>Total</div>
-                    <div>${calculatedFare.totalAmount}</div>
-                  </div>
-                  
-                  {/* Price Guarantee */}
-                  <div className="flex items-center justify-center mt-4 text-xs text-green-700 bg-green-50 rounded-full py-1">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Price Guaranteed • Won't Find It Lower
-                  </div>
-                </div>
+                {renderFareSummary()}
               </div>
             </div>
           </div>
@@ -878,7 +913,11 @@ export default function FlightBookingConfirmation() {
                 </div>
                 
                 <div className="text-sm text-blue-600 mb-4">
-                  Booking details & alerts will also be sent to {passengerData[0].firstName} {passengerData[0].lastName}
+                  {passengerData.length > 0 ? (
+                    `Booking details & alerts will also be sent to ${passengerData[0].firstName} ${passengerData[0].lastName}`
+                  ) : (
+                    "Please add passenger details to receive booking alerts"
+                  )}
                 </div>
                 
                 <div>
@@ -898,59 +937,7 @@ export default function FlightBookingConfirmation() {
                 
                 {/* Add-on Options */}
                 {bookingDetails?.addOns && bookingDetails.addOns.length > 0 ? (
-                  bookingDetails.addOns.map((addon) => (
-                    <div 
-                      key={addon.id} 
-                      className={`p-4 rounded-lg mb-3 ${addon.popular ? 'bg-blue-50 border border-blue-200' : 'bg-purple-50 border border-purple-200'}`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-start">
-                          <svg 
-                            className="w-5 h-5 text-green-500 mr-2 mt-1" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                          </svg>
-                          <div>
-                            <div className="flex items-center">
-                              <h3 className="font-medium">{addon.title}</h3>
-                              {addon.popular && (
-                                <span className="ml-2 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                                  Most Popular
-                                </span>
-                              )}
-                            </div>
-                            <ul className="mt-1">
-                              {addon.benefits && addon.benefits.map((benefit, i) => (
-                                <li key={i} className="text-sm text-gray-600 flex items-center">
-                                  <svg className="w-3 h-3 text-green-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                  </svg>
-                                  {benefit}
-                                </li>
-                              ))}
-                            </ul>
-                            <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">
-                              Know More
-                            </button>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-gray-600 text-sm">
-                            @₹{addon.price}{addon.perTraveller ? '/traveller' : ''}
-                          </div>
-                          <button 
-                            onClick={() => toggleAddon(addon.id)}
-                            className={`mt-2 ${selectedAddons.includes(addon.id) ? 'bg-green-600' : 'bg-blue-600'} text-white px-4 py-1 rounded hover:opacity-90 transition-colors text-sm`}
-                          >
-                            {selectedAddons.includes(addon.id) ? 'Added' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                  bookingDetails.addOns.map((addon) => renderAddon(addon))
                 ) : (
                   <div className="p-4 rounded-lg mb-3 bg-gray-50 border border-gray-200">
                     <p className="text-gray-500 text-center">No add-ons available for this flight</p>
@@ -972,7 +959,7 @@ export default function FlightBookingConfirmation() {
                       </span>
                     </div>
                     <div>
-                      <h3 className="font-medium">Fly Like a VIP @ Just ${bookingDetails?.vipServiceFee || '25'}</h3>
+                      <h3 className="font-medium">Fly Like a VIP @ Just {calculatedFare.currency} {bookingDetails?.vipServiceFee.toFixed(2)}</h3>
                       <p className="text-sm text-gray-600">Be amongst the first to check-in and get your bags tagged with priority status with {typeof bookingDetails?.flight?.airline === 'string'
                         ? bookingDetails?.flight?.airline
                         : bookingDetails?.flight?.airline?.name || 'JetSetters Airlines'} Priority Check-in & Bag Services.</p>
@@ -1005,7 +992,7 @@ export default function FlightBookingConfirmation() {
                     Priority Bag Service
                   </div>
                   <span>=</span>
-                  <span className="font-medium">${bookingDetails?.vipServiceFee}</span>
+                  <span className="font-medium">{calculatedFare.currency} {bookingDetails?.vipServiceFee.toFixed(2)}</span>
                 </div>
               </div>
             </div>

@@ -94,7 +94,12 @@ export default function FlightLanding() {
       const data = response.data;
       if (data && data.success !== false) {
         console.log('Search successful, navigating to results');
-        navigate('/flights/search', { state: { searchData: data } });
+        navigate('/flights/search', { 
+          state: { 
+            searchData: searchData, // Original search parameters
+            apiResponse: data // API response
+          } 
+        });
       } else {
         console.log("No flight results found:", data?.error || 'Unknown error');
       }

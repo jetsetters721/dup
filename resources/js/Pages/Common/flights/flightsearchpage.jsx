@@ -16,6 +16,7 @@ export default function FlightSearchPage() {
   
   const location = useLocation();
   const searchData = location.state?.searchData;
+  const apiResponse = location.state?.apiResponse;
 
   console.log('searchData:', searchData);
   
@@ -29,7 +30,7 @@ export default function FlightSearchPage() {
     travelers: 1,
     tripType: 'one-way'
   });
-  const [flights, setFlights] = useState([]);
+  const [flights, setFlights] = useState(apiResponse?.data || []);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("price");
   const [dateRange, setDateRange] = useState([]);
@@ -596,94 +597,12 @@ export default function FlightSearchPage() {
 
   // Handle booking a flight
   const handleBookFlight = (flight) => {
-    // Create a booking reference to pass to the confirmation page
-    const bookingReference = {
-      flight: {
-        ...flight,
-        airline: flight.segments[0]?.airline?.name || 'Unknown Airline',
-        flightNumber: flight.segments[0]?.flightNumber || 'N/A',
-        departureCity: flight.segments[0]?.departure?.city || 'Unknown',
-        arrivalCity: flight.segments[0]?.arrival?.city || 'Unknown',
-        departureTime: flight.segments[0]?.departure?.at || 'N/A',
-        arrivalTime: flight.segments[0]?.arrival?.at || 'N/A',
-        duration: flight.duration || 'N/A',
-        cabin: flight.segments[0]?.cabin || 'Economy',
-        fareType: 'Standard',
-        basePrice: flight.price?.base || 0,
-        tax: flight.price?.total - flight.price?.base || 0,
-        totalPrice: flight.price?.total || 0,
-        departureAirport: {
-          name: flight.segments[0]?.departure?.iataCode || 'N/A',
-          city: flight.segments[0]?.departure?.city || 'Unknown'
-        },
-        arrivalAirport: {
-          name: flight.segments[0]?.arrival?.iataCode || 'N/A',
-          city: flight.segments[0]?.arrival?.city || 'Unknown'
-        },
-        stops: flight.segments.length - 1
-      },
-      passengers: parseInt(searchParams.travelers) || 1,
-      tripType: searchParams.tripType,
-      departDate: searchParams.departDate,
-      returnDate: searchParams.returnDate,
-      bookingId: `JET${Math.floor(Math.random() * 100000)}`,
-      isInternational: flight.segments[0]?.departure?.iataCode !== flight.segments[0]?.arrival?.iataCode,
-      baggage: {
-        cabin: flight.segments[0]?.baggage?.cabin || "1 piece, 7 kg",
-        checkIn: flight.segments[0]?.baggage?.checked || "1 piece, 23 kg"
-      },
-      contact: {
-        email: "guest@jetsetter.com",
-        phone: "+1 123-456-7890"
-      },
-      addOns: [
-        {
-          id: 1,
-          name: "Travel Insurance",
-          title: "Travel Insurance",
-          description: "Comprehensive coverage for your journey",
-          price: 25,
-          popular: true,
-          selected: false,
-          benefits: [
-            "Trip cancellation coverage",
-            "Medical emergency coverage",
-            "Lost baggage protection"
-          ]
-        },
-        {
-          id: 2,
-          name: "Airport Transfer",
-          title: "Airport Transfer",
-          description: "Comfortable ride to/from your accommodation",
-          price: 35,
-          popular: false,
-          selected: false,
-          benefits: [
-            "24/7 service availability",
-            "Professional drivers",
-            "Free waiting time"
-          ]
-        }
-      ],
-      vipServiceFee: 30,
-      visaRequirements: flight.segments[0]?.departure?.iataCode !== flight.segments[0]?.arrival?.iataCode ? {
-        destination: flight.segments[0]?.arrival?.city || 'Unknown',
-        visaType: "Tourist/Business",
-        processingTime: "3-5 business days",
-        requirements: [
-          "Valid passport with at least 6 months validity",
-          "Completed visa application form",
-          "Recent passport-sized photographs",
-          "Proof of accommodation"
-        ],
-        officialWebsite: "https://visa.gov.example"
-      } : null
-    };
-    
-    // Navigate to the booking confirmation page with flight details
-    navigate('/flights/booking-confirmation', { 
-      state: { bookingDetails: bookingReference } 
+    // Navigate to booking confirmation page with flight data
+    navigate('/flights/booking/confirmation', {
+      state: {
+        flightData: flight,
+        searchData: searchParams
+      }
     });
   };
 
