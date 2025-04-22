@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { Calendar, Users, MapPin, Search, ChevronDown } from "lucide-react"
-import { defaultSearchData, specialFares } from "./data.js"
+import { defaultSearchData, specialFares, sourceCities, allDestinations } from "./data.js"
 
 // Get this from a config or parent component
 const USE_AMADEUS_API = true;
@@ -10,6 +10,17 @@ const USE_AMADEUS_API = true;
 export default function FlightSearchForm({ initialData, onSearch }) {
   const [formData, setFormData] = useState(initialData || defaultSearchData)
   const [formErrors, setFormErrors] = useState({})
+
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
+  const [fromSuggestions, setFromSuggestions] = useState([]);
+  const [toSuggestions, setToSuggestions] = useState([]);
+
+  // Create a map of city names to their codes
+  const cityCodeMap = allDestinations.reduce((acc, city) => {
+    acc[city.name] = city.code;
+    return acc;
+  }, {});
 
   // Update form data when initialData changes
   useEffect(() => {
@@ -22,17 +33,51 @@ export default function FlightSearchForm({ initialData, onSearch }) {
     setFormData({ ...formData, tripType: type })
   }
 
-  const handleInputChange = (field, value) => {
-    setFormData({ ...formData, [field]: value })
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "from") {
+      setShowFromSuggestions(true);
+      const filtered = sourceCities
+        .filter((city) =>
+          city.toLowerCase().includes(value.toLowerCase())
+        )
+        .map(city => ({
+          name: city,
+          code: cityCodeMap[city]
+        }));
+      setFromSuggestions(filtered);
+    } else if (name === "to") {
+      setShowToSuggestions(true);
+      const filtered = allDestinations
+        .filter((city) =>
+          city.name.toLowerCase().includes(value.toLowerCase())
+        )
+        .map(city => ({
+          name: city.name,
+          code: city.code
+        }));
+      setToSuggestions(filtered);
+    }
     
     // Clear validation error when field is changed
-    if (formErrors[field]) {
+    if (formErrors[name]) {
       setFormErrors({
         ...formErrors,
-        [field]: null
+        [name]: null
       });
     }
   }
+
+  const handleSuggestionClick = (name, field) => {
+    setFormData((prev) => ({ ...prev, [field]: name }));
+    if (field === "from") {
+      setShowFromSuggestions(false);
+    } else {
+      setShowToSuggestions(false);
+    }
+  };
 
   const validateForm = () => {
     const errors = {};
@@ -107,13 +152,27 @@ export default function FlightSearchForm({ initialData, onSearch }) {
             <div className="relative">
               <input
                 type="text"
+                name="from"
                 value={formData.from || ""}
-                onChange={(e) => handleInputChange("from", e.target.value)}
+                onChange={handleInputChange}
                 className="w-full p-3 border border-gray-200 rounded-md text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Departure city"
               />
               <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             </div>
+            {showFromSuggestions && fromSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-auto">
+                {fromSuggestions.map((city, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleSuggestionClick(city.name, "from")}
+                  >
+                    {city.name} ({city.code})
+                  </div>
+                ))}
+              </div>
+            )}
             {formErrors.from && (
               <p className="text-red-500 text-xs mt-1">{formErrors.from}</p>
             )}
@@ -125,13 +184,27 @@ export default function FlightSearchForm({ initialData, onSearch }) {
             <div className="relative">
               <input
                 type="text"
+                name="to"
                 value={formData.to || ""}
-                onChange={(e) => handleInputChange("to", e.target.value)}
+                onChange={handleInputChange}
                 className="w-full p-3 border border-gray-200 rounded-md text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Destination city"
               />
               <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             </div>
+            {showToSuggestions && toSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-auto">
+                {toSuggestions.map((city, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleSuggestionClick(city.name, "to")}
+                  >
+                    {city.name} ({city.code})
+                  </div>
+                ))}
+              </div>
+            )}
             {formErrors.to && (
               <p className="text-red-500 text-xs mt-1">{formErrors.to}</p>
             )}
@@ -143,8 +216,9 @@ export default function FlightSearchForm({ initialData, onSearch }) {
             <div className="relative">
               <input
                 type="date"
+                name="departDate"
                 value={formData.departDate || ""}
-                onChange={(e) => handleInputChange("departDate", e.target.value)}
+                onChange={handleInputChange}
                 className="w-full p-3 border border-gray-200 rounded-md text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Select date"
               />
@@ -162,8 +236,9 @@ export default function FlightSearchForm({ initialData, onSearch }) {
               <div className="relative">
                 <input
                   type="date"
+                  name="returnDate"
                   value={formData.returnDate || ""}
-                  onChange={(e) => handleInputChange("returnDate", e.target.value)}
+                  onChange={handleInputChange}
                   className="w-full p-3 border border-gray-200 rounded-md text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Select date"
                 />
@@ -180,8 +255,9 @@ export default function FlightSearchForm({ initialData, onSearch }) {
             <label className="text-gray-600 text-sm font-medium mb-2 block">Travelers</label>
             <div className="relative">
               <select
+                name="travelers"
                 value={formData.travelers || "2"}
-                onChange={(e) => handleInputChange("travelers", e.target.value)}
+                onChange={handleInputChange}
                 className="w-full p-3 appearance-none border border-gray-200 rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="1">1 Traveler</option>

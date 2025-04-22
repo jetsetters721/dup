@@ -1,14 +1,25 @@
-import React from "react"
+import React, { useState } from "react"
 import { destinations } from "./data.js"
 
 export default function PopularDestinations({ onSelectDestination }) {
+  const [selectedDestination, setSelectedDestination] = useState(null);
+
+  const handleDestinationClick = (destination) => {
+    setSelectedDestination(destination);
+    if (onSelectDestination) {
+      onSelectDestination(destination.name);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {destinations.map((destination, index) => (
         <div
           key={destination.id}
-          className="rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative h-[320px] cursor-pointer group"
-          onClick={() => onSelectDestination && onSelectDestination(destination.name)}
+          className={`rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 relative h-[320px] cursor-pointer group ${
+            selectedDestination?.id === destination.id ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => handleDestinationClick(destination)}
         >
           {/* Full bleed image with slight zoom on hover */}
           <div className="absolute inset-0 w-full h-full">
@@ -16,15 +27,16 @@ export default function PopularDestinations({ onSelectDestination }) {
               src={destination.image || "/placeholder.svg"} 
               alt={destination.name} 
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+              loading="lazy"
             />
             {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30"></div>
           </div>
           
           {/* Badge - Only for first item */}
           {index === 0 && (
             <div className="absolute top-4 left-4 z-10">
-              <div className="bg-blue-600 text-white text-sm font-medium py-1 px-4 rounded-full shadow-md">
+              <div className="bg-blue-600 text-white text-sm font-medium py-1 px-4 rounded-full shadow-md animate-pulse">
                 Popular Choice
               </div>
             </div>
@@ -39,6 +51,9 @@ export default function PopularDestinations({ onSelectDestination }) {
             <div>
               <h3 className="text-white text-2xl font-bold mb-1">
                 {destination.name}
+                <span className="ml-2 text-blue-300 text-sm font-normal">
+                  ({destination.code})
+                </span>
               </h3>
               
               <div className="flex items-center mb-4">
@@ -63,7 +78,7 @@ export default function PopularDestinations({ onSelectDestination }) {
                   />
                 </svg>
                 <span className="text-white/90">
-                  {destination.region}, Sri Lanka
+                  {destination.region}
                 </span>
               </div>
               
@@ -86,13 +101,15 @@ export default function PopularDestinations({ onSelectDestination }) {
                 
                 {/* Book now button */}
                 <button 
-                  className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white text-xs font-medium py-1 px-3 rounded-lg transition-colors"
+                  className={`bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white text-xs font-medium py-1 px-3 rounded-lg transition-colors ${
+                    selectedDestination?.id === destination.id ? 'bg-blue-500 hover:bg-blue-600' : ''
+                  }`}
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent triggering the card click
-                    onSelectDestination && onSelectDestination(destination.name);
+                    handleDestinationClick(destination);
                   }}
                 >
-                  Book Now
+                  {selectedDestination?.id === destination.id ? 'Selected' : 'Book Now'}
                 </button>
               </div>
             </div>

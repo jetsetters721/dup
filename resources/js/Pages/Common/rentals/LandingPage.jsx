@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import Navbar from "../Navbar"
 import Footer from "../Footer"
 import { 
@@ -25,8 +25,10 @@ import {
 } from "lucide-react"
 import { hotels, popularDestinations } from "./hotel"
 import { useState, useEffect, useRef } from "react"
+import axios from 'axios';
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isVisible, setIsVisible] = useState({});
   const [isFavorite, setIsFavorite] = useState({});
@@ -39,6 +41,8 @@ export default function LandingPage() {
   const [searchDates, setSearchDates] = useState("Select dates");
   const [searchTravelers, setSearchTravelers] = useState(2);
   const [filteredHotels, setFilteredHotels] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   
   // Date picker states
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -217,6 +221,50 @@ export default function LandingPage() {
     { icon: <Coffee size={18} />, text: "Breakfast" },
     { icon: <Shield size={18} />, text: "Security" }
   ];
+
+  // Handle search submission
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      // Prepare search parameters
+      const searchParams = {
+        destination: searchDestination,
+        packageType: searchPackageType,
+        dates: searchDates,
+        travelers: searchTravelers
+      };
+
+      // Make API call to search hotels
+      const response = await axios.post('http://localhost:5001/api/hotels/search', searchParams, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data && response.data.success) {
+        // Store filtered hotels in state
+        setFilteredHotels(response.data.hotels);
+        
+        // Navigate to hotel details page with search results
+        navigate('/hotel-details', {
+          state: {
+            searchParams,
+            hotels: response.data.hotels
+          }
+        });
+      } else {
+        setSearchError('No hotels found matching your criteria');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError('An error occurred while searching. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-white font-poppins overflow-x-hidden">
@@ -503,23 +551,30 @@ export default function LandingPage() {
                 </div>
                 
                 <div className="flex justify-center md:justify-end px-3 mt-4 mb-1 relative z-10">
-                  <Link 
-                    to={`/hotel-details?destination=${encodeURIComponent(searchDestination)}&packageType=${encodeURIComponent(searchPackageType)}&dates=${encodeURIComponent(searchDates)}&travelers=${searchTravelers}`} 
-                    className="w-full md:w-auto"
-                    onClick={(e) => {
-                      // If destination is empty and there's a first hotel, navigate directly to it
-                      if (!searchDestination.trim() && hotels.length > 0) {
-                        e.preventDefault();
-                        window.location.href = `/hotel-details?id=${hotels[0].id}`;
-                      }
-                    }}
+                  <button 
+                    onClick={handleSearch}
+                    className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-3.5 px-10 rounded-xl transition-all duration-300 font-medium flex items-center justify-center gap-3 shadow-lg hover:shadow-blue-500/30 transform hover:-translate-y-0.5"
+                    disabled={isSearching}
                   >
-                    <button className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-3.5 px-10 rounded-xl transition-all duration-300 font-medium flex items-center justify-center gap-3 shadow-lg hover:shadow-blue-500/30 transform hover:-translate-y-0.5">
-                      <Search size={20} />
-                      <span>Search</span>
-                    </button>
-                  </Link>
+                    {isSearching ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Searching...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search size={20} />
+                        <span>Search</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+                
+                {searchError && (
+                  <div className="mt-4 text-center text-red-500 text-sm">
+                    {searchError}
+                  </div>
+                )}
               </div>
             </div>
           </div>
