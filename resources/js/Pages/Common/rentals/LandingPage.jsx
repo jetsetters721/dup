@@ -231,14 +231,14 @@ export default function LandingPage() {
     try {
       // Prepare search parameters
       const searchParams = {
-        destination: searchDestination,
+        city: searchDestination,
         packageType: searchPackageType,
         dates: searchDates,
         travelers: searchTravelers
       };
 
-      // Make API call to search hotels
-      const response = await axios.post('http://localhost:5001/api/hotels/search', searchParams, {
+      // Make API call to search hotels by city
+      const response = await axios.get(`http://localhost:5001/api/reference-data/locations/hotels/by-city?city=${encodeURIComponent(searchDestination)}`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -246,17 +246,18 @@ export default function LandingPage() {
 
       if (response.data && response.data.success) {
         // Store filtered hotels in state
-        setFilteredHotels(response.data.hotels);
+        const hotels = response.data.hotels || [];
+        setFilteredHotels(hotels);
         
         // Navigate to hotel details page with search results
         navigate('/hotel-details', {
           state: {
             searchParams,
-            hotels: response.data.hotels
+            hotels: hotels
           }
         });
       } else {
-        setSearchError('No hotels found matching your criteria');
+        setSearchError('No hotels found in this location');
       }
     } catch (error) {
       console.error('Search error:', error);

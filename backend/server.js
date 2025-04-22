@@ -6,6 +6,7 @@ import hotelRoutes from './routes/hotel.routes.js';
 import flightRoutes from './routes/flight.routes.js';
 import cruiseRoutes from './routes/cruise.routes.js';
 import emailRoutes from './routes/email.routes.js';
+import rentalsRoutes from './routes/rentalsRoutes.js';
 // import 
 // const flightRoutes =re('./routes/flights');
 // Load environment variables
@@ -57,7 +58,7 @@ app.use('/api/hotels', hotelRoutes);
 app.use('/api/flights', flightRoutes);
 app.use('/api/cruises', cruiseRoutes);
 app.use('/api/email', emailRoutes);
-
+app.use('/api', rentalsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

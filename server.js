@@ -7,6 +7,7 @@ import authRoutes from './backend/routes/auth.routes.js';
 import userRoutes from './backend/routes/user.routes.js';
 import emailRoutes from './backend/routes/email.routes.js';
 import flightRoutes from './backend/routes/flight.routes.js';
+import rentalsRoutes from './backend/routes/rentalsRoutes.js';
 import supabase from './backend/config/supabase.js';
 
 // Initialize environment variables
@@ -105,6 +106,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/flights', flightRoutes);
+app.use('/api', rentalsRoutes);
 
 // Direct test email endpoint
 app.post('/api/send-email', async (req, res) => {
@@ -182,8 +184,8 @@ app.post('/api/send-email', async (req, res) => {
     
     // Close the HTML structure
     html += `
+            </div>
           </div>
-          
           <p>Best regards,<br>The JetSetGo Team</p>
         </div>
         <div style="padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #f1f1f1;">
@@ -192,11 +194,11 @@ app.post('/api/send-email', async (req, res) => {
         </div>
       </div>
     `;
-    
+
     const text = html.replace(/<[^>]*>?/gm, '')
       .replace(/\s+/g, ' ')
       .trim();
-    
+
     try {
       // Always use a verified sender email with Resend
       const result = await resend.emails.send({
@@ -248,75 +250,13 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
-// Debug middleware for email routes
-app.use('/api/email/*', (req, res, next) => {
-  console.log(`🔍 Email route accessed: ${req.method} ${req.originalUrl}`);
-  console.log('🔍 Request headers:', req.headers);
-  console.log('🔍 Request body:', req.body);
-  next();
-});
-
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-  });
-}
-
-// For local development
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === undefined) {
-  const findAvailablePort = async (startPort) => {
-  const maxPort = 65535;
-  let port = parseInt(startPort, 10);
-
-  while (port <= maxPort) {
-    try {
-      await new Promise((resolve, reject) => {
-        const server = app.listen(port)
-          .once('listening', () => {
-            server.close();
-            resolve();
-          })
-          .once('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-              reject(err);
-            } else {
-              reject(err);
-            }
-          });
-      });
-      return port;
-    } catch (err) {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`⚠️ Port ${port} is in use, trying next port...`);
-        port++;
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('No available ports found');
-};
-
+// Start the server
 const startServer = async () => {
   try {
-    const port = await findAvailablePort(PORT);
-    const server = app.listen(port, () => {
-      console.log(`🚀 Server running on port ${port}`);
-      
-      // Re-apply CORS middleware with updated settings
-      app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', req.headers.origin);
-        res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
-        res.header('Access-Control-Allow-Credentials', 'true');
-        
-        if (req.method === 'OPTIONS') {
-          return res.sendStatus(200);
-        }
-        next();
-      });
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log('Environment:', process.env.NODE_ENV);
+      console.log('API Base URL:', '/api');
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -325,7 +265,3 @@ const startServer = async () => {
 };
 
 startServer();
-}
-
-// For Vercel serverless deployment
-export default app;
