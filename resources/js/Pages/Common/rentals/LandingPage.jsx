@@ -21,9 +21,10 @@ import {
   MapPin,
   Award,
   Sparkles,
-  X
+  X,
+  Loader
 } from "lucide-react"
-import { hotels, popularDestinations } from "./hotel"
+import { popularDestinations } from "./hotel"
 import { useState, useEffect, useRef } from "react"
 import axios from 'axios';
 
@@ -43,6 +44,7 @@ export default function LandingPage() {
   const [filteredHotels, setFilteredHotels] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  const [cityCode, setCityCode] = useState("");
   
   // Date picker states
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -60,10 +62,74 @@ export default function LandingPage() {
   const [filteredSuggestions, setFilteredSuggestions] = useState([]);
   const destinationRef = useRef(null);
 
+  // Fetch destinations from backend
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const response = await axios.get('/api/hotels/destinations');
+        if (response.data.success) {
+          setDestinationSuggestions(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching destinations:', error);
+      }
+    };
+    fetchDestinations();
+  }, []);
+
+  // Handle search submission
+  const handleSearch = async () => {
+    if (!searchDestination) {
+      setSearchError("Please select a destination");
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      const response = await axios.post('/api/hotels/search', {
+        destination: cityCode,
+        dates: searchDates !== "Select dates" ? searchDates : undefined,
+        travelers: searchTravelers,
+        checkInDate: selectedStartDate,
+        checkOutDate: selectedEndDate
+      });
+
+      if (response.data.success) {
+        setFilteredHotels(response.data.data);
+        setIsSearching(false);
+      } else {
+        setSearchError(response.data.message || "No hotels found");
+        setIsSearching(false);
+      }
+    } catch (error) {
+      setSearchError(error.response?.data?.message || "Error searching hotels");
+      setIsSearching(false);
+    }
+  };
+
+  // Handle destination selection
+  const handleDestinationSelect = (destination) => {
+    setSearchDestination(destination.name);
+    setCityCode(destination.code);
+    setShowDestinationSuggestions(false);
+  };
+
+  // Filter destinations as user types
+  const handleDestinationInput = (value) => {
+    setSearchDestination(value);
+    const filtered = destinationSuggestions.filter(dest => 
+      dest.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setFilteredSuggestions(filtered);
+    setShowDestinationSuggestions(true);
+  };
+
   // Extract unique destinations from hotels
   useEffect(() => {
     // Populate destination suggestions from hotels data
-    const uniqueDestinations = [...new Set(hotels.map(hotel => hotel.location))];
+    const uniqueDestinations = [...new Set(popularDestinations.map(hotel => hotel.location))];
     setDestinationSuggestions(uniqueDestinations);
   }, []);
   
@@ -96,7 +162,33 @@ export default function LandingPage() {
     return days;
   };
   
-  // Handle date selection
+  // Handle manual date input
+  const handleManualDateInput = (value, type) => {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return; // Invalid date
+
+    if (type === 'start') {
+      setSelectedStartDate(date);
+      // If end date exists and is before new start date, clear it
+      if (selectedEndDate && selectedEndDate < date) {
+        setSelectedEndDate(null);
+      }
+    } else {
+      if (!selectedStartDate) {
+        setSearchError('Please select a check-in date first');
+        return;
+      }
+      if (date <= selectedStartDate) {
+        setSearchError('Check-out date must be after check-in date');
+        return;
+      }
+      setSelectedEndDate(date);
+    }
+
+    updateDateRange(type === 'start' ? date : selectedStartDate, type === 'end' ? date : selectedEndDate);
+  };
+
+  // Handle calendar date selection
   const handleDateSelect = (day) => {
     if (!day) return;
     
@@ -106,20 +198,45 @@ export default function LandingPage() {
       setSelectedStartDate(selectedDate);
       setSelectedEndDate(null);
       setHoverDate(null);
+      updateDateRange(selectedDate, null);
     } else {
       if (selectedDate < selectedStartDate) {
         setSelectedStartDate(selectedDate);
         setSelectedEndDate(null);
+        updateDateRange(selectedDate, null);
       } else {
         setSelectedEndDate(selectedDate);
-        
-        // Format dates and update searchDates
-        const startDateStr = `${selectedStartDate.getDate()} ${months[selectedStartDate.getMonth()].substring(0, 3)}`;
-        const endDateStr = `${selectedDate.getDate()} ${months[selectedDate.getMonth()].substring(0, 3)}`;
-        setSearchDates(`${startDateStr} - ${endDateStr} ${currentYear}`);
+        updateDateRange(selectedStartDate, selectedDate);
         setShowDatePicker(false);
       }
     }
+  };
+
+  // Update the date range display
+  const updateDateRange = (startDate, endDate) => {
+    if (!startDate) {
+      setSearchDates('Select dates');
+      return;
+    }
+
+    const formattedStartDate = startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    if (!endDate) {
+      setSearchDates(`${formattedStartDate} - Select checkout`);
+      return;
+    }
+
+    const formattedEndDate = endDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    setSearchDates(`${formattedStartDate} - ${formattedEndDate}`);
   };
   
   // Handle date hover for range selection
@@ -193,11 +310,11 @@ export default function LandingPage() {
   }, [activeIndex]);
 
   const nextSlide = () => {
-    setActiveIndex((current) => (current === hotels.length - 1 ? 0 : current + 1));
+    setActiveIndex((current) => (current === popularDestinations.length - 1 ? 0 : current + 1));
   };
 
   const prevSlide = () => {
-    setActiveIndex((current) => (current === 0 ? hotels.length - 1 : current - 1));
+    setActiveIndex((current) => (current === 0 ? popularDestinations.length - 1 : current - 1));
   };
   
   const toggleFavorite = (id, e) => {
@@ -221,51 +338,6 @@ export default function LandingPage() {
     { icon: <Coffee size={18} />, text: "Breakfast" },
     { icon: <Shield size={18} />, text: "Security" }
   ];
-
-  // Handle search submission
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    setIsSearching(true);
-    setSearchError(null);
-
-    try {
-      // Prepare search parameters
-      const searchParams = {
-        city: searchDestination,
-        packageType: searchPackageType,
-        dates: searchDates,
-        travelers: searchTravelers
-      };
-
-      // Make API call to search hotels by city
-      const response = await axios.get(`http://localhost:5001/api/reference-data/locations/hotels/by-city?city=${encodeURIComponent(searchDestination)}`, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.data && response.data.success) {
-        // Store filtered hotels in state
-        const hotels = response.data.hotels || [];
-        setFilteredHotels(hotels);
-        
-        // Navigate to hotel details page with search results
-        navigate('/hotel-details', {
-          state: {
-            searchParams,
-            hotels: hotels
-          }
-        });
-      } else {
-        setSearchError('No hotels found in this location');
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchError('An error occurred while searching. Please try again.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
 
   return (
     <main className="min-h-screen bg-white font-poppins overflow-x-hidden">
@@ -322,7 +394,7 @@ export default function LandingPage() {
                       <input
                         type="text"
                         value={searchDestination}
-                        onChange={(e) => filterDestinations(e.target.value)}
+                        onChange={(e) => handleDestinationInput(e.target.value)}
                         onFocus={() => {
                           if (searchDestination.length > 0) {
                             setShowDestinationSuggestions(true);
@@ -345,13 +417,10 @@ export default function LandingPage() {
                               <li 
                                 key={index}
                                 className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center"
-                                onClick={() => {
-                                  setSearchDestination(destination);
-                                  setShowDestinationSuggestions(false);
-                                }}
+                                onClick={() => handleDestinationSelect(destination)}
                               >
                                 <MapPin className="h-4 w-4 text-blue-500 mr-2" />
-                                <span>{destination}</span>
+                                <span>{destination.name}</span>
                               </li>
                             ))}
                           </ul>
@@ -393,113 +462,122 @@ export default function LandingPage() {
                       <Calendar className="h-4 w-4 text-blue-500" />
                       Travel Date
                     </label>
-                    <div className="relative group" ref={datePickerRef}>
-                      <div 
-                        onClick={() => setShowDatePicker(!showDatePicker)} 
-                        className="flex items-center w-full py-3 pl-4 pr-10 bg-gray-50/80 border border-gray-200 rounded-xl cursor-pointer transition-all duration-300 hover:border-blue-200 group-hover:shadow-sm"
-                      >
-                        <span className="text-gray-700">{searchDates}</span>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <div className="p-1 rounded-full bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300">
-                            <Calendar className="h-4 w-4 text-blue-500" />
-                          </div>
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Check-in Date */}
+                      <div className="flex-1 relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Check-in Date
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={selectedStartDate ? selectedStartDate.toISOString().split('T')[0] : ''}
+                            min={new Date().toISOString().split('T')[0]}
+                            onChange={(e) => handleManualDateInput(e.target.value, 'start')}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          />
+                          <Calendar 
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" 
+                          />
                         </div>
                       </div>
-                      
-                      {/* Date Picker Dropdown */}
+
+                      {/* Check-out Date */}
+                      <div className="flex-1 relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Check-out Date
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={selectedEndDate ? selectedEndDate.toISOString().split('T')[0] : ''}
+                            min={selectedStartDate ? new Date(selectedStartDate.getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                            onChange={(e) => handleManualDateInput(e.target.value, 'end')}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            disabled={!selectedStartDate}
+                          />
+                          <Calendar 
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Calendar Picker Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        className="md:self-end px-4 py-2 text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
+                      >
+                        <span className="sr-only">Open calendar</span>
+                        <Calendar className="h-5 w-5" />
+                      </button>
+
+                      {/* Calendar Picker Dropdown */}
                       {showDatePicker && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden w-72 md:w-80">
-                          <div className="p-3 pb-0">
-                            <div className="flex justify-between items-center mb-2">
-                              <div className="text-sm font-medium text-gray-900">Select dates</div>
-                              <button 
-                                onClick={resetDateSelection}
-                                className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                            
-                            <div className="flex justify-between items-center mb-2">
-                              <button 
-                                onClick={() => {
-                                  if (currentMonth === 0) {
-                                    setCurrentMonth(11);
-                                    setCurrentYear(currentYear - 1);
-                                  } else {
-                                    setCurrentMonth(currentMonth - 1);
-                                  }
-                                }}
-                                className="p-1 rounded-full hover:bg-gray-100"
-                              >
-                                <ChevronLeft size={18} className="text-gray-600" />
-                              </button>
-                              
-                              <span className="text-sm font-medium">
-                                {months[currentMonth]} {currentYear}
-                              </span>
-                              
-                              <button 
-                                onClick={() => {
-                                  if (currentMonth === 11) {
-                                    setCurrentMonth(0);
-                                    setCurrentYear(currentYear + 1);
-                                  } else {
-                                    setCurrentMonth(currentMonth + 1);
-                                  }
-                                }}
-                                className="p-1 rounded-full hover:bg-gray-100"
-                              >
-                                <ChevronRight size={18} className="text-gray-600" />
-                              </button>
-                            </div>
-                            
-                            {/* Day names */}
-                            <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-                              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, i) => (
-                                <div key={i} className="py-1">{day}</div>
-                              ))}
-                            </div>
+                        <div
+                          ref={datePickerRef}
+                          className="absolute z-10 mt-1 w-auto bg-white border border-gray-200 rounded-lg shadow-lg p-4"
+                          style={{ top: '100%', left: '50%', transform: 'translateX(-50%)' }}
+                        >
+                          <div className="flex justify-between items-center mb-4">
+                            <button
+                              onClick={() => {
+                                setCurrentMonth(prev => prev === 0 ? 11 : prev - 1);
+                                setCurrentYear(prev => currentMonth === 0 ? prev - 1 : prev);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded-full"
+                            >
+                              <ChevronLeft className="h-5 w-5" />
+                            </button>
+                            <span className="font-medium">
+                              {months[currentMonth]} {currentYear}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setCurrentMonth(prev => prev === 11 ? 0 : prev + 1);
+                                setCurrentYear(prev => currentMonth === 11 ? prev + 1 : prev);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded-full"
+                            >
+                              <ChevronRight className="h-5 w-5" />
+                            </button>
                           </div>
-                          
-                          {/* Calendar grid */}
-                          <div className="grid grid-cols-7 gap-0 p-2 pt-0">
+
+                          <div className="grid grid-cols-7 gap-1 mb-2">
+                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                              <div key={day} className="text-center text-sm font-medium text-gray-400">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-7 gap-1">
                             {generateCalendarDays().map((day, index) => {
-                              if (day === null) {
-                                return <div key={index} className="h-8 w-8"></div>;
-                              }
-                              
-                              const date = new Date(currentYear, currentMonth, day);
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              
-                              const isToday = date.getTime() === today.getTime();
-                              const isPast = date < today;
-                              const isSelected = selectedStartDate && date.getTime() === selectedStartDate.getTime() || 
-                                                selectedEndDate && date.getTime() === selectedEndDate.getTime();
-                              const isRangeDate = isInRange(day);
-                              
+                              const date = day ? new Date(currentYear, currentMonth, day) : null;
+                              const isSelected = date && (
+                                (selectedStartDate && date.getTime() === selectedStartDate.getTime()) ||
+                                (selectedEndDate && date.getTime() === selectedEndDate.getTime())
+                              );
+                              const isInRange = date && isInRange(date);
+                              const isToday = date && date.toDateString() === new Date().toDateString();
+
                               return (
-                                <div 
-                                  key={index}
-                                  className="flex items-center justify-center"
-                                  onMouseEnter={() => handleDateHover(day)}
+                                <button
+                                  key={`${day}-${index}`}
+                                  onClick={() => day && handleDateSelect(day)}
+                                  onMouseEnter={() => day && handleDateHover(day)}
+                                  disabled={!day || (date && date < new Date())}
+                                  className={`
+                                    p-2 text-sm rounded-md
+                                    ${!day ? 'invisible' : ''}
+                                    ${isSelected ? 'bg-blue-500 text-white' : ''}
+                                    ${isInRange ? 'bg-blue-100' : ''}
+                                    ${isToday ? 'border border-blue-500' : ''}
+                                    ${date && date < new Date() ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}
+                                  `}
                                 >
-                                  <button
-                                    type="button"
-                                    disabled={isPast}
-                                    onClick={() => handleDateSelect(day)}
-                                    className={`
-                                      h-8 w-8 rounded-full text-xs flex items-center justify-center
-                                      ${isPast ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'}
-                                      ${isToday ? 'border border-blue-400' : ''}
-                                      ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : ''}
-                                      ${isRangeDate ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' : ''}
-                                    `}
-                                  >
-                                    {day}
-                                  </button>
-                                </div>
+                                  {day}
+                                </button>
                               );
                             })}
                           </div>
@@ -559,7 +637,7 @@ export default function LandingPage() {
                   >
                     {isSearching ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <Loader className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                         <span>Searching...</span>
                       </>
                     ) : (
@@ -626,13 +704,13 @@ export default function LandingPage() {
                 className="flex transition-transform duration-700 ease-out"
                 style={{ transform: `translateX(-${activeIndex * 100}%)` }}
               >
-                {hotels.map((hotel, index) => (
-                  <div key={hotel.id} className="min-w-full">
+                {popularDestinations.map((destination, index) => (
+                  <div key={destination.id} className="min-w-full">
                     <div className="grid grid-cols-1 md:grid-cols-2 bg-white overflow-hidden">
                       <div className="relative h-80 md:h-auto overflow-hidden">
                         <img
-                          src={hotel.images.main || "/placeholder.svg"}
-                          alt={hotel.name}
+                          src={destination.image || "/placeholder.svg"}
+                          alt={destination.name}
                           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
@@ -647,27 +725,27 @@ export default function LandingPage() {
                         {/* Favorite Button */}
                         <button 
                           className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-2 rounded-full text-gray-600 hover:text-red-500 transition-colors shadow-md focus:outline-none"
-                          onClick={(e) => toggleFavorite(hotel.id, e)}
+                          onClick={(e) => toggleFavorite(destination.id, e)}
                           aria-label="Add to favorites"
                         >
-                          <Heart size={20} className={isFavorite[hotel.id] ? "text-red-500 fill-red-500" : ""} />
+                          <Heart size={20} className={isFavorite[destination.id] ? "text-red-500 fill-red-500" : ""} />
                         </button>
                         
                         {/* Price Badge */}
                         <div className="absolute bottom-4 left-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg">
-                          ${hotel.price} <span className="text-xs font-normal">per night</span>
+                          ${destination.price} <span className="text-xs font-normal">per night</span>
                         </div>
                       </div>
                       
                       <div className="p-8 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-2xl font-bold text-gray-800">{hotel.name}</h3>
+                            <h3 className="text-2xl font-bold text-gray-800">{destination.name}</h3>
                           </div>
                           
                           <div className="flex items-center gap-2 mb-4 text-gray-600">
                             <MapPin size={18} className="text-blue-500" />
-                            <span className="text-sm">{hotel.location}</span>
+                            <span className="text-sm">{destination.location}</span>
                           </div>
                           
                           <p className="text-gray-600 mb-6 leading-relaxed">
@@ -687,7 +765,7 @@ export default function LandingPage() {
                         <div className="mt-auto">
                           <div className="flex flex-wrap items-center justify-between gap-4">
                             <Link
-                              to={`/hotel-details?id=${hotel.id}`}
+                              to={`/hotel-details?id=${destination.id}`}
                               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg transition-all duration-300 font-medium inline-flex items-center gap-2 shadow-md hover:shadow-blue-500/30 group"
                             >
                               View Details
@@ -716,7 +794,7 @@ export default function LandingPage() {
             </button>
             
             <div className="flex justify-center gap-2 mt-8">
-              {hotels.slice(0, 5).map((_, idx) => (
+              {popularDestinations.slice(0, 5).map((_, idx) => (
                 <button 
                   key={idx} 
                   onClick={() => setActiveIndex(idx)}
@@ -875,7 +953,7 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto" id="testimonials-grid">
-              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-all duration-500 hover:-translate-y-2 hover:shadow-xl">
+              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-transform hover:-translate-y-2 hover:shadow-xl">
                 <div className="absolute -top-5 left-8">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center shadow-lg">
                     <span className="text-white text-2xl font-serif">"</span>
@@ -904,7 +982,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-all duration-500 hover:-translate-y-2 hover:shadow-xl">
+              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-transform hover:-translate-y-2 hover:shadow-xl">
                 <div className="absolute -top-5 left-8">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center shadow-lg">
                     <span className="text-white text-2xl font-serif">"</span>
@@ -933,7 +1011,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-all duration-500 hover:-translate-y-2 hover:shadow-xl">
+              <div className="bg-white p-8 rounded-xl shadow-lg relative transform transition-transform hover:-translate-y-2 hover:shadow-xl">
                 <div className="absolute -top-5 left-8">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center shadow-lg">
                     <span className="text-white text-2xl font-serif">"</span>

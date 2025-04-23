@@ -86,58 +86,73 @@ export const hotels = [
 export const popularDestinations = [
   {
     id: 1,
-    name: "Shangri-La",
-    location: "Colombo, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1780&auto=format&fit=crop",
-    hotelCount: 70,
-    popular: true
+    name: "Paris",
+    code: "PAR",
+    country: "France",
+    image: "https://images.unsplash.com/photo-1499856871958-5b9627545d1a",
+    description: "The City of Light",
+    rating: 4.8,
+    reviews: 1250
   },
   {
     id: 2,
-    name: "Top View",
-    location: "Hikkaduwe, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 50,
-    popular: false
+    name: "London",
+    code: "LON",
+    country: "United Kingdom",
+    image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad",
+    description: "A Royal Experience",
+    rating: 4.7,
+    reviews: 980
   },
   {
     id: 3,
-    name: "Green Villa",
-    location: "Kandy, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 70,
-    popular: false
+    name: "New York",
+    code: "NYC",
+    country: "United States",
+    image: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9",
+    description: "The City That Never Sleeps",
+    rating: 4.9,
+    reviews: 2100
   },
   {
     id: 4,
-    name: "Wodden Pit",
-    location: "Ambalangoda, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 50,
-    popular: false
+    name: "Tokyo",
+    code: "TYO",
+    country: "Japan",
+    image: "https://images.unsplash.com/photo-1536098561742-ca998e48cbcc",
+    description: "Where Tradition Meets Future",
+    rating: 4.8,
+    reviews: 1560
   },
   {
     id: 5,
-    name: "Boutique",
-    location: "Kandy, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 50,
-    popular: false
+    name: "Dubai",
+    code: "DXB",
+    country: "UAE",
+    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c",
+    description: "Luxury in the Desert",
+    rating: 4.9,
+    reviews: 890
   },
   {
     id: 6,
-    name: "Modern",
-    location: "Nuwereliya, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 30,
-    popular: false
+    name: "Rome",
+    code: "ROM",
+    country: "Italy",
+    image: "https://images.unsplash.com/photo-1525874684015-58379d421a52",
+    description: "The Eternal City",
+    rating: 4.7,
+    reviews: 1100
   },
   {
     id: 7,
-    name: "Silver Rain",
-    location: "Dehiwala, Sri Lanka",
-    image: "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=2070&auto=format&fit=crop",
-    hotelCount: 40,
+    name: "Singapore",
+    code: "SIN",
+    country: "Singapore",
+    image: "https://images.unsplash.com/photo-1525625293386-3f8f99389edd",
+    description: "Garden City of Asia",
+    rating: 4.8,
+    reviews: 950,
     popular: false
   },
   {
