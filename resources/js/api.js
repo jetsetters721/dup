@@ -3,7 +3,7 @@ import axios from 'axios';
 // Determine API URL based on environment
 const API_URL = process.env.NODE_ENV === 'production' 
   ? '/api' // In production, use relative URL that will be handled by Express
-  : 'http://localhost:5000/api'; // In development, use full URL
+  : 'http://localhost:5001/api'; // In development, use full URL
 
 const api = axios.create({
   baseURL: API_URL,

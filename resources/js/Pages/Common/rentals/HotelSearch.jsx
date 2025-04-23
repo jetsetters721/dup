@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate ,useLocation} from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { FaSearch, FaCalendarAlt, FaUser } from 'react-icons/fa';
 import axios from 'axios';
 
 const HotelSearch = () => {
-  const navigate = useNavigate();
+ 
+const location = useLocation();
+const hotels = location.state?.hotels;
+console.error(hotels,'dddddddddddddddddddddd')
   // Try to load last search from session storage
   const [searchParams, setSearchParams] = useState(() => {
     const savedSearch = sessionStorage.getItem('lastHotelSearch');

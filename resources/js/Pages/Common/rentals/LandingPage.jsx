@@ -66,7 +66,7 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchDestinations = async () => {
       try {
-        const response = await axios.get('/api/hotels/destinations');
+        const response = await axios.get('http://localhost:5001/api/hotels/destinations');
         if (response.data.success) {
           setDestinationSuggestions(response.data.data);
         }
@@ -86,25 +86,27 @@ export default function LandingPage() {
 
     setIsSearching(true);
     setSearchError(null);
-
+// console.log(cityCode,'kkkkkkkkkkkkkk')
     try {
-      const response = await axios.post('/api/hotels/search', {
-        destination: cityCode,
-        dates: searchDates !== "Select dates" ? searchDates : undefined,
-        travelers: searchTravelers,
-        checkInDate: selectedStartDate,
-        checkOutDate: selectedEndDate
+      const response = await axios.get('http://localhost:5001/api/hotels/search', {
+        params: {
+          destination: cityCode,
+          dates: searchDates !== "Select dates" ? searchDates : undefined,
+          travelers: searchTravelers,
+          checkInDate: selectedStartDate,
+          checkOutDate: selectedEndDate
+        }
       });
-
       if (response.data.success) {
         setFilteredHotels(response.data.data);
+        navigate("/hotel-search", { state: { hotels: response.data.data } });
         setIsSearching(false);
       } else {
         setSearchError(response.data.message || "No hotels found");
         setIsSearching(false);
       }
     } catch (error) {
-      setSearchError(error.response?.data?.message || "Error searching hotels");
+      setSearchError(error.response?.data?.message || "Error searching hotels***************");
       setIsSearching(false);
     }
   };

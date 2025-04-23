@@ -1,4 +1,49 @@
 import hotelService from '../services/hotel.service.js';
+import axios from 'axios';
+
+// const getAccessToken = async () => {
+//   const response = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token', null, {
+//     headers: {
+//       'Content-Type': 'application/x-www-form-urlencoded',
+//     },
+//     auth: {
+//       username: process.env.REACT_APP_AMADEUS_API_KEY, // Use server-side env vars
+//       password: process.env.REACT_APP_AMADEUS_API_SECRET,
+//     },
+//     params: {
+//       grant_type: 'client_credentials',
+//     }
+//   });
+
+//   return response.data.access_token;
+// };
+
+
+const getAccessToken = async () => {
+  try {
+    const response = await axios.post(
+      'https://test.api.amadeus.com/v1/security/oauth2/token',
+      new URLSearchParams({ grant_type: 'client_credentials' }).toString(), // form body
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        auth: {
+          username: 'YuGXhM4V1ZXx1K1tpRNDYSa1VCQAGGZf',    // Make sure this is set in your .env
+          password: 'NMhnya69yWkjO8IY'   // Make sure this is set in your .env
+        }
+      }
+    );
+
+    console.log('Access Token:', response.data.access_token);
+    return response.data.access_token;
+
+  } catch (error) {
+    console.error('Failed to get access token:', error.response?.data || error.message);
+    throw new Error('Could not generate access token');
+  }
+};
+
 
 export const listHotels = async (req, res) => {
   try {
@@ -45,24 +90,18 @@ export const getDestinations = async (req, res) => {
 };
 
 export const searchHotels = async (req, res) => {
+  console.log(req);
   try {
-    console.log(' ' + new Date().toISOString() + ' - ' + req.method + ' ' + req.url);
-    console.log(' Headers:', JSON.stringify(req.get('Content-Type')));
-    console.log(' Body:', JSON.stringify(req.body));
-
-    // Handle both GET and POST requests
     const params = req.method === 'POST' ? req.body : req.query;
     const { destination, dates, travelers, cityCode, checkInDate, checkOutDate, adults } = params;
+    console.log(params,'sssssssssssssssssssss')
 
-    // Get the search parameters, preferring the POST body format
     const searchParams = {
       cityCode: cityCode || destination,
-      checkInDate: checkInDate,
-      checkOutDate: checkOutDate,
+      checkInDate,
+      checkOutDate,
       adults: parseInt(adults || travelers) || 2
     };
-
-    // If dates string is provided (from POST), parse it
     if (dates && dates !== 'Select dates') {
       const [start, end] = dates.split(' - ');
       if (start && end) {
@@ -71,19 +110,25 @@ export const searchHotels = async (req, res) => {
       }
     }
 
-    // Validate required parameters
-    if (!searchParams.cityCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'Destination city code is required'
-      });
-    }
+    // Get access token
+    const token = await getAccessToken();
 
-    const hotels = await hotelService.searchHotels(searchParams);
-    
+    // Fetch hotel offers from Amadeus API
+    const response = await axios.get('https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      params: {
+        cityCode: searchParams.cityCode,
+        radius: 5,
+        radiusUnit: 'KM',
+        amenities: 'ROOM_SERVICE',
+        hotelSource: 'ALL'
+      }
+    });
     res.json({
       success: true,
-      data: hotels
+      data: response.data
     });
   } catch (error) {
     console.error('Error in searchHotels:', error);
@@ -93,6 +138,8 @@ export const searchHotels = async (req, res) => {
     });
   }
 };
+
+
 
 export const getHotelDetails = async (req, res) => {
   try {

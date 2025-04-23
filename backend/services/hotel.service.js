@@ -18,6 +18,24 @@ class HotelService {
     this.CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
   }
 
+  async  getAccessToken() {
+    const response = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token', null, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      auth: {
+        username: process.env.REACT_APP_AMADEUS_API_KEY,
+        password: process.env.REACT_APP_AMADEUS_API_SECRET,
+      },
+      params: {
+        grant_type: 'client_credentials',
+      }
+    });
+  
+    return response.data.access_token;
+  }
+
+
   async getDestinations() {
     try {
       // Check cache first
@@ -88,21 +106,38 @@ class HotelService {
       };
 
       // Search for hotel offers
-      const response = await this.amadeus.shopping.hotelOffers.get({
-        cityCode,
-        checkInDate: searchDates.checkIn,
-        checkOutDate: searchDates.checkOut,
-        adults,
-        radius: 50,
-        radiusUnit: 'KM',
-        includeClosed: false,
-        bestRateOnly: true,
-        view: 'FULL'
-      });
 
+      //https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city
+      // const response = await this.amadeus.shopping.hotelOffers.get({
+      //   cityCode,
+      //   checkInDate: searchDates.checkIn,
+      //   checkOutDate: searchDates.checkOut,
+      //   adults,
+      //   radius: 50,
+      //   radiusUnit: 'KM',
+      //   includeClosed: false,
+      //   bestRateOnly: true,
+      //   view: 'FULL'
+      // });
+      console.log('cccccccccccccccccc')
+      const token = await this.getAccessToken();
+
+      const response = await axios.get('https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        params: {
+          cityCode:"PAR",               // e.g., 'PAR'
+          radius: 5,              // radius in KM
+          radiusUnit: 'KM',       // KM or MI
+          amenities: 'ROOM_SERVICE',
+          hotelSource: 'ALL'
+        }
+      });
+      console.log(response,'kkkkkkkkkkkkkkkkkkkkkkkkkk')
       return response.data || [];
     } catch (error) {
-      console.error('Error searching hotels:', error);
+      console.error('Error searching hotels:sssssssssssssssssssssssssss', error);
       throw new Error(error.description?.[0]?.detail || error.message || 'Failed to search hotels');
     }
   }
