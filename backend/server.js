@@ -25,10 +25,10 @@ app.use((req, res, next) => {
 
 // CORS configuration
 const corsOptions = {
-  origin: '*', // Allow all origins
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   optionsSuccessStatus: 200
 };
 
@@ -46,9 +46,23 @@ app.get('/api/test', (req, res) => {
     timestamp: new Date().toISOString(),
     cors: {
       origin: req.headers.origin,
-      allowedOrigins: corsOptions.origin.toString()
+      allowedOrigins: corsOptions.origin
     }
   });
+});
+
+// Add error handling for undefined routes
+app.use((req, res, next) => {
+  if (!req.route) {
+    console.log('404 - Route not found:', req.path);
+    return res.status(404).json({ 
+      success: false,
+      message: `Route ${req.path} not found`,
+      path: req.path,
+      method: req.method
+    });
+  }
+  next();
 });
 
 // Routes
@@ -57,7 +71,6 @@ app.use('/api/hotels', hotelRoutes);
 app.use('/api/flights', flightRoutes);
 app.use('/api/cruises', cruiseRoutes);
 app.use('/api/email', emailRoutes);
-
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -70,21 +83,17 @@ app.use((err, req, res, next) => {
 
   if (err.message.includes('Not allowed by CORS')) {
     return res.status(403).json({
+      success: false,
       message: 'CORS error: Origin not allowed',
-      allowedOrigins: corsOptions.origin.toString()
+      allowedOrigins: corsOptions.origin
     });
   }
 
   res.status(err.status || 500).json({
+    success: false,
     message: err.message || 'Internal server error',
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
-});
-
-// Handle 404 routes
-app.use((req, res) => {
-  console.log('404 - Route not found:', req.path);
-  res.status(404).json({ message: `Route ${req.path} not found` });
 });
 
 const PORT = process.env.PORT || 5001;

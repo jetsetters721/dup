@@ -84,9 +84,9 @@ export default function FlightLanding() {
       const response = await axios.post("http://localhost:5001/api/flights/search", searchData, {
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          "Accept": "application/json"
         },
-        withCredentials: true
+        withCredentials: false
       });
   
       console.log('Got response:', response);

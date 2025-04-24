@@ -199,8 +199,12 @@ export default function LandingPage() {
   // Filter destinations as user types
   const handleDestinationInput = (value) => {
     setSearchDestination(value);
+    if (!destinationSuggestions || !Array.isArray(destinationSuggestions)) {
+      setFilteredSuggestions([]);
+      return;
+    }
     const filtered = destinationSuggestions.filter(dest => 
-      dest.name.toLowerCase().includes(value.toLowerCase())
+      dest && dest.name && dest.name.toLowerCase().includes(value.toLowerCase())
     );
     setFilteredSuggestions(filtered);
     setShowDestinationSuggestions(true);
