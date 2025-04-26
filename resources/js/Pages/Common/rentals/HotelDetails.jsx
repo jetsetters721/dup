@@ -12,7 +12,7 @@ import Footer from "../Footer";
 import "./styles.css";
 import rentalsCallbackService from "../../../services/rentalsCallbackService";
 import { FaMapMarkerAlt, FaCalendarAlt, FaSearch, FaStar, FaArrowRight, FaChevronRight, FaAngleDown, FaUsers } from 'react-icons/fa';
-import hotelService from '../../../services/hotelService';
+
 
 // API base URL
 const API_BASE_URL = 'http://localhost:5001/api';
@@ -87,6 +87,11 @@ export default function HotelDetails() {
 
   // Fetch hotel details when component mounts
   useEffect(() => {
+
+
+    const hotels = location.state.hotelData;
+    
+    console.error(hotels,'kkkkkkkkkkkkkkkkkkkkk')
     const fetchHotelDetails = async () => {
       try {
         setLoading(true);

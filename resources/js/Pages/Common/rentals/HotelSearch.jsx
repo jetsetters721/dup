@@ -9,7 +9,7 @@ const HotelSearch = () => {
  
 const location = useLocation();
 const hotels = location.state?.hotels;
-console.error(hotels,'dddddddddddddddddddddd')
+
   // Try to load last search from session storage
   const [searchParams, setSearchParams] = useState(() => {
     const savedSearch = sessionStorage.getItem('lastHotelSearch');
