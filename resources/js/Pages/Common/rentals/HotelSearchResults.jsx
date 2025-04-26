@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Star, MapPin, Wifi, Coffee, Tv, Users, Heart, ArrowLeft } from 'lucide-react';
+import { Star, MapPin, Wifi, Coffee, Tv, Users, Heart, ArrowLeft, Search, X, Globe, Calendar, ChevronDown } from 'lucide-react';
 import Navbar from '../Navbar';
 import Footer from '../Footer';
 import axios from 'axios';
@@ -18,6 +18,160 @@ export default function HotelSearchResults() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [favorites, setFavorites] = useState({});
+  
+  // Search states
+  const [searchDestination, setSearchDestination] = useState(searchParams.cityCode || "");
+  const [searchDates, setSearchDates] = useState("Select dates");
+  const [searchTravelers, setSearchTravelers] = useState(searchParams.adults || 2);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [cityCode, setCityCode] = useState(searchParams.cityCode || "");
+  
+  // Date picker states
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedStartDate, setSelectedStartDate] = useState(null);
+  const [selectedEndDate, setSelectedEndDate] = useState(null);
+  const [hoverDate, setHoverDate] = useState(null);
+  const datePickerRef = useRef(null);
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  // Destination search suggestion states
+  const [destinationSuggestions, setDestinationSuggestions] = useState([]);
+  const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState([]);
+  const destinationRef = useRef(null);
+
+  // Fetch destinations from backend
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const response = await axios.get('http://localhost:5001/api/hotels/destinations', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        if (response.data.success) {
+          setDestinationSuggestions(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching destinations:', error);
+      }
+    };
+    fetchDestinations();
+  }, []);
+
+  // Handle search submission
+  const handleSearch = async () => {
+    if (!searchDestination || !cityCode) {
+      setSearchError("Please select a destination");
+      return;
+    }
+
+    if (!selectedStartDate || !selectedEndDate) {
+      setSearchError("Please select both check-in and check-out dates");
+      return;
+    }
+
+    // Validate date range
+    if (selectedEndDate <= selectedStartDate) {
+      setSearchError("Check-out date must be after check-in date");
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      const response = await axios.get('http://localhost:5001/api/hotels/search', {
+        params: {
+          destination: cityCode,
+          checkInDate: selectedStartDate.toISOString().split('T')[0],
+          checkOutDate: selectedEndDate.toISOString().split('T')[0],
+          travelers: searchTravelers
+        }
+      });
+
+      if (response.data.success) {
+        const hotelsData = response.data.data?.data || [];
+        const formattedResults = hotelsData.map(hotel => ({
+          id: hotel.hotelId || Math.random().toString(36).substr(2, 9),
+          name: hotel.name || 'Hotel Name Not Available',
+          location: hotel.address?.cityName || `${hotel.address?.countryCode || 'US'}`,
+          price: '150', // Default price
+          rating: hotel.rating || ((Math.random() * 2 + 3).toFixed(1)),
+          image: hotel.media?.images?.[0]?.uri || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+          amenities: hotel.amenities || ['WiFi', 'Room Service', 'Restaurant']
+        }));
+
+        setSearchResults(formattedResults);
+        setFilteredHotels(formattedResults);
+        setSearchParams({
+          cityCode,
+          checkInDate: selectedStartDate.toISOString().split('T')[0],
+          checkOutDate: selectedEndDate.toISOString().split('T')[0],
+          adults: searchTravelers
+        });
+      } else {
+        setError(response.data.message || "No hotels found");
+      }
+    } catch (error) {
+      console.error('Error searching hotels:', error);
+      setError(error.response?.data?.message || "Error searching hotels");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle destination input
+  const handleDestinationInput = (value) => {
+    setSearchDestination(value);
+    if (value.length > 0) {
+      const filtered = destinationSuggestions.filter(dest => 
+        dest.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredSuggestions(filtered);
+      setShowDestinationSuggestions(filtered.length > 0);
+    } else {
+      setShowDestinationSuggestions(false);
+    }
+  };
+
+  // Handle destination selection
+  const handleDestinationSelect = (destination) => {
+    setSearchDestination(destination.name);
+    setCityCode(destination.code);
+    setShowDestinationSuggestions(false);
+  };
+
+  // Update date range display
+  const updateDateRange = (startDate, endDate) => {
+    if (!startDate) {
+      setSearchDates('Select dates');
+      return;
+    }
+
+    const formattedStartDate = startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    if (!endDate) {
+      setSearchDates(`${formattedStartDate} - Select checkout`);
+      return;
+    }
+
+    const formattedEndDate = endDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    setSearchDates(`${formattedStartDate} - ${formattedEndDate}`);
+  };
 
   // Fetch search results if not available in location state
   useEffect(() => {
@@ -94,6 +248,16 @@ export default function HotelSearchResults() {
 
     let filtered = [...searchResults];
 
+    // Apply search query filter
+    if (searchDestination) {
+      const query = searchDestination.toLowerCase();
+      filtered = filtered.filter(hotel => 
+        hotel.name.toLowerCase().includes(query) ||
+        hotel.location.toLowerCase().includes(query) ||
+        hotel.amenities.some(amenity => amenity.toLowerCase().includes(query))
+      );
+    }
+
     // Apply price filter
     filtered = filtered.filter(hotel => {
       const price = parseFloat(hotel.price);
@@ -133,7 +297,7 @@ export default function HotelSearchResults() {
     }
 
     setFilteredHotels(filtered);
-  }, [searchResults, sortBy, priceRange, selectedAmenities, selectedRating]);
+  }, [searchResults, sortBy, priceRange, selectedAmenities, selectedRating, searchDestination]);
 
   const toggleFavorite = (hotelId) => {
     setFavorites(prev => ({
@@ -189,50 +353,212 @@ export default function HotelSearchResults() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
-      {/* Search Summary */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                Hotels in {searchParams.cityCode}
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {formatDate(searchParams.checkInDate)} - {formatDate(searchParams.checkOutDate)} · {searchParams.adults} {searchParams.adults === 1 ? 'guest' : 'guests'}
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="recommended">Recommended</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="rating">Highest Rated</option>
-              </select>
+      {/* Add a 120px margin below navbar */}
+      <div style={{ marginTop: '120px' }} />
 
-              <select
-                value={`${priceRange[0]}-${priceRange[1]}`}
-                onChange={(e) => {
-                  const [min, max] = e.target.value.split('-').map(Number);
-                  setPriceRange([min, max]);
+      {/* Search/Filter Section - now with 120px gap below navbar */}
+      <div className="bg-white shadow-lg rounded-xl max-w-7xl mx-auto px-4 py-6 mb-8">
+        {/* Search Form */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
+          {/* Destination */}
+          <div className="flex flex-col space-y-2 p-4 bg-white rounded-xl shadow-md border border-gray-100">
+            <label className="text-sm text-gray-700 font-medium flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-blue-500" />
+              Destination
+            </label>
+            <div className="relative group" ref={destinationRef}>
+              <input
+                type="text"
+                value={searchDestination}
+                onChange={(e) => handleDestinationInput(e.target.value)}
+                onFocus={() => {
+                  if (searchDestination.length > 0) {
+                    setShowDestinationSuggestions(true);
+                  }
                 }}
-                className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="0-1000">All Prices</option>
-                <option value="0-100">Under $100</option>
-                <option value="100-200">$100 - $200</option>
-                <option value="200-300">$200 - $300</option>
-                <option value="300-500">$300 - $500</option>
-                <option value="500-1000">$500+</option>
-              </select>
+                placeholder="Where do you want to go?"
+                className="w-full py-3 pl-4 pr-10 bg-gray-50/80 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:border-blue-200"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <div className="p-1 rounded-full bg-blue-50">
+                  <Globe className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+              {/* Destination Suggestions Dropdown */}
+              {showDestinationSuggestions && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                  <ul className="py-1">
+                    {filteredSuggestions.map((destination, index) => (
+                      <li 
+                        key={index}
+                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center"
+                        onClick={() => handleDestinationSelect(destination)}
+                      >
+                        <MapPin className="h-4 w-4 text-blue-500 mr-2" />
+                        <span>{destination.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
+          {/* Travel Dates */}
+          <div className="flex flex-col space-y-2 p-4 bg-white rounded-xl shadow-md border border-gray-100">
+            <label className="text-sm text-gray-700 font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-blue-500" />
+              Travel Dates
+            </label>
+            <div 
+              className="relative group cursor-pointer"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              ref={datePickerRef}
+            >
+              <div className="w-full py-3 pl-4 pr-10 bg-gray-50/80 border border-gray-200 rounded-xl hover:border-blue-200 transition-all duration-300">
+                <span className="text-gray-700">{searchDates}</span>
+              </div>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <div className="p-1 rounded-full bg-blue-50">
+                  <Calendar className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+              {/* Date Picker */}
+              {showDatePicker && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 0) {
+                          setCurrentMonth(11);
+                          setCurrentYear(currentYear - 1);
+                        } else {
+                          setCurrentMonth(currentMonth - 1);
+                        }
+                      }}
+                      className="p-2 hover:bg-gray-100 rounded-lg"
+                    >
+                      <ChevronDown className="rotate-90" size={20} />
+                    </button>
+                    <span className="font-medium">
+                      {months[currentMonth]} {currentYear}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 11) {
+                          setCurrentMonth(0);
+                          setCurrentYear(currentYear + 1);
+                        } else {
+                          setCurrentMonth(currentMonth + 1);
+                        }
+                      }}
+                      className="p-2 hover:bg-gray-100 rounded-lg"
+                    >
+                      <ChevronDown className="-rotate-90" size={20} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="text-center text-sm text-gray-500 py-1">
+                        {day}
+                      </div>
+                    ))}
+                    {Array.from({ length: new Date(currentYear, currentMonth, 1).getDay() }).map((_, i) => (
+                      <div key={`empty-${i}`} />
+                    ))}
+                    {Array.from({ length: new Date(currentYear, currentMonth + 1, 0).getDate() }).map((_, i) => {
+                      const day = i + 1;
+                      const date = new Date(currentYear, currentMonth, day);
+                      const isSelected = selectedStartDate && selectedEndDate && 
+                        date >= selectedStartDate && date <= selectedEndDate;
+                      const isStart = selectedStartDate && date.getTime() === selectedStartDate.getTime();
+                      const isEnd = selectedEndDate && date.getTime() === selectedEndDate.getTime();
+                      const isInRange = selectedStartDate && !selectedEndDate && 
+                        date > selectedStartDate && date <= (hoverDate || selectedStartDate);
+
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => {
+                            if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+                              setSelectedStartDate(date);
+                              setSelectedEndDate(null);
+                              updateDateRange(date, null);
+                            } else if (date > selectedStartDate) {
+                              setSelectedEndDate(date);
+                              updateDateRange(selectedStartDate, date);
+                            } else {
+                              setSelectedStartDate(date);
+                              setSelectedEndDate(null);
+                              updateDateRange(date, null);
+                            }
+                          }}
+                          onMouseEnter={() => {
+                            if (selectedStartDate && !selectedEndDate) {
+                              setHoverDate(date);
+                            }
+                          }}
+                          className={`
+                            p-2 rounded-lg text-sm
+                            ${isSelected ? 'bg-blue-100 text-blue-700' : ''}
+                            ${isStart ? 'bg-blue-500 text-white rounded-l-lg' : ''}
+                            ${isEnd ? 'bg-blue-500 text-white rounded-r-lg' : ''}
+                            ${isInRange ? 'bg-blue-50 text-blue-700' : ''}
+                            ${!isSelected && !isStart && !isEnd && !isInRange ? 'hover:bg-gray-100' : ''}
+                          `}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Travelers */}
+          <div className="flex flex-col space-y-2 p-4 bg-white rounded-xl shadow-md border border-gray-100">
+            <label className="text-sm text-gray-700 font-medium flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-500" />
+              Travelers
+            </label>
+            <div 
+              onClick={() => setSearchTravelers(searchTravelers === 2 ? 4 : 2)}
+              className="flex items-center w-full py-3 pl-4 pr-10 bg-gray-50/80 border border-gray-200 rounded-xl cursor-pointer transition-all duration-300 hover:border-blue-200"
+            >
+              <span className="text-gray-700">{searchTravelers} Travelers</span>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <div className="p-1 rounded-full bg-blue-50">
+                  <Users className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Search Button */}
+          <div className="flex flex-col justify-end">
+            <button 
+              onClick={handleSearch}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 px-12 rounded-xl transition-all duration-300 font-medium flex items-center justify-center gap-3 shadow-lg hover:shadow-blue-500/30"
+              disabled={isSearching}
+            >
+              {isSearching ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <>
+                  <Search size={20} />
+                  <span>Search Hotels</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
+        {searchError && (
+          <div className="mt-4 text-center text-red-500 text-sm bg-red-50 p-2 rounded-lg">
+            {searchError}
+          </div>
+        )}
       </div>
 
       {/* Results Grid */}
@@ -243,7 +569,7 @@ export default function HotelSearchResults() {
               {/* Hotel Image */}
               <div className="relative h-48">
                 <img
-                  src={hotel.image || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'}
+                  src={hotel.image}
                   alt={hotel.name}
                   className="w-full h-full object-cover"
                 />
@@ -289,7 +615,12 @@ export default function HotelSearchResults() {
                     <p className="text-sm text-gray-600">per night</p>
                   </div>
                   <button
-                    onClick={() => navigate(`/hotel/${hotel.id}`)}
+                    onClick={() => navigate(`/hotel-details`, { 
+                      state: { 
+                        hotelData: hotel,
+                        searchParams: searchParams
+                      } 
+                    })}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     View Details
