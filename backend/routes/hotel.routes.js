@@ -1,8 +1,10 @@
 import express from 'express';
 import { listHotels, searchHotels, getDestinations } from '../controllers/hotel.controller.js';
 import axios from 'axios';
-const router = express.Router();
+import dayjs from 'dayjs';
 
+const router = express.Router();
+// console.log('coming to this page')
 // Get list of destinations
 router.get('/destinations', getDestinations);
 
@@ -23,7 +25,7 @@ const getAccessToken = async () => {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         auth: {
-          username: 'YuGXhM4V1ZXx1K1tpRNDYSa1VCQAGGZf',    // Make sure this is set in your .env
+          username: 'a9Gz1aJ5Noo7sOvTb11TJ8bwF3jyaAjX',    // Make sure this is set in your .env
           password: 'nw6Gz0x0NusJ9uu3'   // Make sure this is set in your .env
         }
       }
@@ -37,30 +39,48 @@ const getAccessToken = async () => {
     throw new Error('Could not generate access token');
   }
 };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // add 1 because months are 0-indexed
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 // Get hotel offer by ID
-router.get('/offers/:offerId', async (req, res) => {
-
+router.get('/check-availability', async (req, res) => {
   const token = await getAccessToken();
-  const { offerId } = req.params;
-  const { lang } = req.query;
+  const { destination, checkInDate, checkOutDate, travelers, lang } = req.query;
+ 
+  const checkInDate1 = formatDate(checkInDate);
+  const checkOutDate1 =  formatDate(checkOutDate);
 
   try {
-    console.log('Fetching hotel offer pricing for ID:', offerId);
+    // console.log('Fetching hotel offer pricing for ID:', req);
 
-    const response = await axios.get(`https://test.api.amadeus.com/v3/shopping/hotel-offers/${offerId}`, {
+    const response = await axios.get(`https://test.api.amadeus.com/v3/shopping/hotel-offers`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.amadeus+json'
       },
       params: {
-        lang: lang || 'en'
+        hotelIds: destination,     // using destination from frontend as hotelId
+        checkInDate: checkInDate1,
+        checkOutDate: checkOutDate1,
+        adults: travelers,
+        lang: lang || 'en',
+        roomQuantity: 1,
+        currency: 'USD'
       }
     });
     console.log(response.data)
     res.json({ success: true, data: response.data });
   } catch (error) {
     console.error('Amadeus hotel offer error:', error?.response?.data || error.message);
-    res.status(500).json({ success: false, error: error.message });
+    const amadeusErrorMessage = error?.response?.data?.errors?.[0]?.detail
+    res.status(error?.response?.status || 500).json({
+      success: false,
+      message: amadeusErrorMessage
+    });
   }
 });
 

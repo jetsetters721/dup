@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-  Star, MapPin, Check, ChevronLeft, Heart, Share, Calendar, 
-  Users, X, ChevronRight, ChevronDown, ThumbsUp, MessageCircle, 
+import {
+  Star, MapPin, Check, ChevronLeft, Heart, Share, Calendar,
+  Users, X, ChevronRight, ChevronDown, ThumbsUp, MessageCircle,
   Award, Camera, Coffee, ArrowRight, Bookmark, Phone, Mail, Facebook, Twitter, Instagram,
   Clock, Wifi, Tv, Shield, Utensils, Car, Sunset, Sparkles, Info
 } from "lucide-react";
@@ -10,29 +10,29 @@ import Navbar from "../Navbar";
 import Footer from "../Footer";
 import "./styles.css";
 import supabase from "../../../lib/supabase";
-
+import axios from 'axios';
 export default function HotelDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const hotelData = location.state?.hotelData || {};
   const searchParams = location.state?.searchParams || {};
-  
+
   const [selectedHotel, setSelectedHotel] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(0);
-  const [guestCount, setGuestCount] = useState({ 
-    adults: searchParams?.adults || 2, 
-    children: 1 
+  const [guestCount, setGuestCount] = useState({
+    adults: searchParams?.adults || 2,
+    children: 1
   });
   const [showReviews, setShowReviews] = useState(false);
   const [checkInDate, setCheckInDate] = useState(() => {
     // Ensure checkInDate is a string
     if (searchParams?.checkInDate) {
-      return typeof searchParams.checkInDate === 'string' 
-        ? searchParams.checkInDate 
+      return typeof searchParams.checkInDate === 'string'
+        ? searchParams.checkInDate
         : searchParams.checkInDate.toString();
     }
     return "Jul 24, 2025";
@@ -40,8 +40,8 @@ export default function HotelDetails() {
   const [checkOutDate, setCheckOutDate] = useState(() => {
     // Ensure checkOutDate is a string
     if (searchParams?.checkOutDate) {
-      return typeof searchParams.checkOutDate === 'string' 
-        ? searchParams.checkOutDate 
+      return typeof searchParams.checkOutDate === 'string'
+        ? searchParams.checkOutDate
         : searchParams.checkOutDate.toString();
     }
     return "Jul 28, 2025";
@@ -71,6 +71,7 @@ export default function HotelDetails() {
   const amenitiesRef = useRef(null);
   const locationRef = useRef(null);
   const reviewsRef = useRef(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!location.state?.hotelData) {
@@ -83,7 +84,7 @@ export default function HotelDetails() {
     const fetchHotelDetails = async () => {
       try {
         setIsLoading(true);
-        
+
         // Default values
         const defaultPrice = 199;
         const defaultRating = 4.5;
@@ -91,95 +92,95 @@ export default function HotelDetails() {
         const hotelRating = parseFloat(hotelData?.rating) || defaultRating;
 
         const mockRoomTypes = [
-          { 
-            id: 0, 
-            name: "Deluxe Room", 
-            price: basePrice, 
-            capacity: 2, 
-            features: ["Mountain View", "King Bed", "Free WiFi"] 
+          {
+            id: 0,
+            name: "Deluxe Room",
+            price: basePrice,
+            capacity: 2,
+            features: ["Mountain View", "King Bed", "Free WiFi"]
           },
-          { 
-            id: 1, 
-            name: "Premium Suite", 
-            price: basePrice * 1.5, 
-            capacity: 3, 
-            features: ["Lake View", "King Bed + Sofa Bed", "Free WiFi", "Jacuzzi"] 
+          {
+            id: 1,
+            name: "Premium Suite",
+            price: basePrice * 1.5,
+            capacity: 3,
+            features: ["Lake View", "King Bed + Sofa Bed", "Free WiFi", "Jacuzzi"]
           },
-          { 
-            id: 2, 
-            name: "Family Suite", 
-            price: basePrice * 2, 
-            capacity: 4, 
-            features: ["Mountain View", "2 Queen Beds", "Free WiFi", "Kitchenette"] 
+          {
+            id: 2,
+            name: "Family Suite",
+            price: basePrice * 2,
+            capacity: 4,
+            features: ["Mountain View", "2 Queen Beds", "Free WiFi", "Kitchenette"]
           }
         ];
 
         const mockReviews = [
-          { 
-            id: 1, 
-            user: "Sarah J.", 
-            avatar: "https://randomuser.me/api/portraits/women/12.jpg", 
-            rating: hotelRating, 
-            date: "June 2023", 
-            comment: "The hotel exceeded our expectations. Views were breathtaking and staff was very attentive to our needs." 
+          {
+            id: 1,
+            user: "Sarah J.",
+            avatar: "https://randomuser.me/api/portraits/women/12.jpg",
+            rating: hotelRating,
+            date: "June 2023",
+            comment: "The hotel exceeded our expectations. Views were breathtaking and staff was very attentive to our needs."
           },
-          { 
-            id: 2, 
-            user: "Michael T.", 
-            avatar: "https://randomuser.me/api/portraits/men/32.jpg", 
-            rating: hotelRating, 
-            date: "May 2023", 
-            comment: "Perfect for our family vacation! Great amenities and close to all the local attractions." 
+          {
+            id: 2,
+            user: "Michael T.",
+            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+            rating: hotelRating,
+            date: "May 2023",
+            comment: "Perfect for our family vacation! Great amenities and close to all the local attractions."
           },
-          { 
-            id: 3, 
-            user: "Emily P.", 
-            avatar: "https://randomuser.me/api/portraits/women/44.jpg", 
-            rating: hotelRating, 
-            date: "April 2023", 
-            comment: "Beautiful room with amazing views. Only small issue was slow WiFi, but otherwise perfect." 
+          {
+            id: 3,
+            user: "Emily P.",
+            avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+            rating: hotelRating,
+            date: "April 2023",
+            comment: "Beautiful room with amazing views. Only small issue was slow WiFi, but otherwise perfect."
           }
         ];
 
         const mockAmenities = [
-          { 
-            icon: <Wifi className="h-5 w-5" />, 
-            name: "High-Speed WiFi", 
+          {
+            icon: <Wifi className="h-5 w-5" />,
+            name: "High-Speed WiFi",
             description: "Complimentary high-speed internet access throughout the property with speeds up to 100 Mbps."
           },
-          { 
-            icon: <Coffee className="h-5 w-5" />, 
-            name: "Gourmet Breakfast", 
+          {
+            icon: <Coffee className="h-5 w-5" />,
+            name: "Gourmet Breakfast",
             description: "Daily complimentary breakfast buffet featuring local and international cuisine from 7:00 AM to 10:30 AM."
           },
-          { 
-            icon: <Tv className="h-5 w-5" />, 
-            name: "Smart Entertainment", 
+          {
+            icon: <Tv className="h-5 w-5" />,
+            name: "Smart Entertainment",
             description: "55-inch smart TV with premium streaming services including Netflix, Amazon Prime, and local channels."
           },
-          { 
-            icon: <Shield className="h-5 w-5" />, 
-            name: "24/7 Security", 
+          {
+            icon: <Shield className="h-5 w-5" />,
+            name: "24/7 Security",
             description: "Round-the-clock security with CCTV surveillance and secure key card access to all areas."
           },
-          { 
-            icon: <Utensils className="h-5 w-5" />, 
-            name: "Fine Dining", 
+          {
+            icon: <Utensils className="h-5 w-5" />,
+            name: "Fine Dining",
             description: "On-site restaurant offering authentic local cuisine and international dishes prepared by our award-winning chef."
           },
-          { 
-            icon: <Car className="h-5 w-5" />, 
-            name: "Free Parking", 
+          {
+            icon: <Car className="h-5 w-5" />,
+            name: "Free Parking",
             description: "Complimentary valet and self-parking available for all guests throughout their stay."
           },
-          { 
-            icon: <Sunset className="h-5 w-5" />, 
-            name: "Scenic Views", 
+          {
+            icon: <Sunset className="h-5 w-5" />,
+            name: "Scenic Views",
             description: "Rooms featuring panoramic views of the surrounding mountains and valleys."
           },
-          { 
-            icon: <Clock className="h-5 w-5" />, 
-            name: "Flexible Check-in", 
+          {
+            icon: <Clock className="h-5 w-5" />,
+            name: "Flexible Check-in",
             description: "Early check-in and late check-out available upon request, subject to availability."
           }
         ];
@@ -196,13 +197,13 @@ export default function HotelDetails() {
           // Hotel Rooms
           'https://images.unsplash.com/photo-1582719508461-905c673771fd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1600&q=80',
           'https://images.unsplash.com/photo-1618773928121-c33d57733427?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-          
+
           // Hotel Bathroom
           'https://images.unsplash.com/photo-1590490360182-c33d57733427?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80',
-          
+
           // Hotel Views/Pool
           'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-          
+
           // Additional room views
           'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
           'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'
@@ -236,27 +237,27 @@ export default function HotelDetails() {
   useEffect(() => {
     const handleScroll = () => {
       setScrollPosition(window.scrollY);
-      
+
       // Determine which section is currently in view
       const scrollPos = window.scrollY + 100;
-      
-      if (overviewRef.current && scrollPos >= overviewRef.current.offsetTop && 
-          scrollPos < (roomsRef.current?.offsetTop || Infinity)) {
+
+      if (overviewRef.current && scrollPos >= overviewRef.current.offsetTop &&
+        scrollPos < (roomsRef.current?.offsetTop || Infinity)) {
         setActiveTab('overview');
-      } else if (roomsRef.current && scrollPos >= roomsRef.current.offsetTop && 
-                scrollPos < (amenitiesRef.current?.offsetTop || Infinity)) {
+      } else if (roomsRef.current && scrollPos >= roomsRef.current.offsetTop &&
+        scrollPos < (amenitiesRef.current?.offsetTop || Infinity)) {
         setActiveTab('rooms');
-      } else if (amenitiesRef.current && scrollPos >= amenitiesRef.current.offsetTop && 
-                scrollPos < (locationRef.current?.offsetTop || Infinity)) {
+      } else if (amenitiesRef.current && scrollPos >= amenitiesRef.current.offsetTop &&
+        scrollPos < (locationRef.current?.offsetTop || Infinity)) {
         setActiveTab('amenities');
-      } else if (locationRef.current && scrollPos >= locationRef.current.offsetTop && 
-                scrollPos < (reviewsRef.current?.offsetTop || Infinity)) {
+      } else if (locationRef.current && scrollPos >= locationRef.current.offsetTop &&
+        scrollPos < (reviewsRef.current?.offsetTop || Infinity)) {
         setActiveTab('location');
       } else if (reviewsRef.current && scrollPos >= reviewsRef.current.offsetTop) {
         setActiveTab('reviews');
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -264,7 +265,7 @@ export default function HotelDetails() {
   useEffect(() => {
     // 50% chance to show a special promo
     setIsPromoActive(Math.random() > 0.5);
-    
+
     // Add animation classes to elements when they come into view
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -273,11 +274,11 @@ export default function HotelDetails() {
         }
       });
     }, { threshold: 0.1 });
-    
+
     document.querySelectorAll('.animate-on-scroll').forEach(el => {
       observer.observe(el);
     });
-    
+
     return () => {
       document.querySelectorAll('.animate-on-scroll').forEach(el => {
         observer.unobserve(el);
@@ -297,7 +298,7 @@ export default function HotelDetails() {
         setShowAmenityDetails(null);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showGuestDropdown, showDatePicker, showAmenityDetails]);
@@ -317,7 +318,7 @@ export default function HotelDetails() {
 
   const nextImage = () => {
     if (showGalleryModal) {
-      setActiveImage((prev) => 
+      setActiveImage((prev) =>
         prev === selectedHotel.images.gallery.length ? 0 : prev + 1
       );
     }
@@ -325,7 +326,7 @@ export default function HotelDetails() {
 
   const prevImage = () => {
     if (showGalleryModal) {
-      setActiveImage((prev) => 
+      setActiveImage((prev) =>
         prev === 0 ? selectedHotel.images.gallery.length : prev - 1
       );
     }
@@ -355,8 +356,25 @@ export default function HotelDetails() {
     }
   };
 
-  const handleReserveNow = () => {
-    setShowCallbackRequest(true);
+  const handleReserveNow = async () => {
+    console.error(checkInDate, hotelData.id, guestCount.adults, checkOutDate, 'checkInDate')
+    try {
+      const response = await axios.get('http://localhost:5001/api/hotels/check-availability', {
+        params: {
+          destination: hotelData.id,
+          checkInDate: checkInDate,
+          checkOutDate: checkOutDate,
+          travelers: guestCount.adults
+        }
+      });
+      setShowCallbackRequest(true);
+      console.log(response, 'dddddddddddddddddddd')
+    } catch (error) {
+      console.error('Error fetching hotels:', error.response?.data?.message);
+
+      // Set a user-friendly error message
+      setError(error.response?.data?.message || "Error fetching hotels");
+    }
   };
 
   const handleCallbackFormChange = (e) => {
@@ -369,7 +387,7 @@ export default function HotelDetails() {
 
   const handleCallbackSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       // Store the callback request in Supabase
       const { data, error } = await supabase
@@ -391,20 +409,20 @@ export default function HotelDetails() {
 
       // Send confirmation email
       try {
-        const baseUrl = import.meta.env.PROD 
-          ? window.location.origin 
+        const baseUrl = import.meta.env.PROD
+          ? window.location.origin
           : 'http://localhost:5001';
-        
+
         // Convert any potential Date objects to strings
         const checkInString = typeof checkInDate === 'string' ? checkInDate : String(checkInDate);
         const checkOutString = typeof checkOutDate === 'string' ? checkOutDate : String(checkOutDate);
-        
+
         const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             name: callbackForm.name,
             phone: callbackForm.phone,
             email: `${callbackForm.phone.replace(/\D/g, '')}@example.com`, // Generate email from phone
@@ -421,7 +439,7 @@ export default function HotelDetails() {
             }
           })
         });
-        
+
         if (!emailResponse.ok) {
           console.warn('Email confirmation issue:', await emailResponse.text());
         } else {
@@ -434,7 +452,7 @@ export default function HotelDetails() {
 
       console.log('Callback request stored successfully:', data);
       setCallbackSubmitted(true);
-      
+
       // After 3 seconds, show the booking confirmation
       setTimeout(() => {
         setCallbackSubmitted(false);
@@ -479,7 +497,7 @@ export default function HotelDetails() {
           <div className="text-red-500 text-5xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Hotel Not Found</h2>
           <p className="text-gray-600 mb-6">We couldn't find the hotel you're looking for. It may have been removed or you may have followed an incorrect link.</p>
-          <button 
+          <button
             onClick={handleBack}
             className="bg-[#0061ff] hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
           >
@@ -500,7 +518,7 @@ export default function HotelDetails() {
       <div className="min-h-screen bg-white pb-16 pt-16">
         {/* Back button */}
         <div className="px-4 py-3 bg-white shadow-sm">
-          <button 
+          <button
             onClick={handleBack}
             className="flex items-center text-gray-600 hover:text-[#0061ff] transition-colors"
           >
@@ -523,7 +541,7 @@ export default function HotelDetails() {
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                   <span className="ml-1 text-gray-700 font-medium">{selectedHotel.rating}</span>
                   <span className="ml-1 text-gray-500">({selectedHotel.reviewCount} reviews)</span>
-                  <button 
+                  <button
                     onClick={toggleReviews}
                     className="ml-2 text-blue-600 text-sm hover:underline"
                   >
@@ -534,14 +552,14 @@ export default function HotelDetails() {
             </div>
 
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={toggleFavorite}
                 className="p-2 rounded-full border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-red-500 transition-colors"
                 aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
                 <Heart size={20} className={isFavorite ? "text-red-500 fill-red-500" : ""} />
               </button>
-              <button 
+              <button
                 onClick={handleShare}
                 className="p-2 rounded-full border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 transition-colors"
               >
@@ -553,21 +571,21 @@ export default function HotelDetails() {
           {/* Photo gallery - clickable */}
           <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
+              <div
                 className="rounded-lg overflow-hidden h-[300px] md:h-[400px] cursor-pointer relative group"
-                onClick={() => {setShowGalleryModal(true); setActiveImage(0);}}
+                onClick={() => { setShowGalleryModal(true); setActiveImage(0); }}
               >
-                <img 
-                  src={selectedHotel.images.main} 
-                  alt={selectedHotel.name} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                <img
+                  src={selectedHotel.images.main}
+                  alt={selectedHotel.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <div className="bg-white/80 backdrop-blur-sm rounded-full p-2">
                     <Camera className="h-6 w-6 text-gray-800" />
                   </div>
                 </div>
-                
+
                 {/* Featured badge */}
                 <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-1 rounded-full text-xs z-10 font-medium shadow-lg flex items-center">
                   <Sparkles className="h-3 w-3 mr-1 text-yellow-300" />
@@ -576,15 +594,15 @@ export default function HotelDetails() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 {selectedHotel.images.gallery.map((image, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={index}
                     className="rounded-lg overflow-hidden h-[140px] md:h-[192px] cursor-pointer relative group"
-                    onClick={() => {setShowGalleryModal(true); setActiveImage(index + 1);}}
+                    onClick={() => { setShowGalleryModal(true); setActiveImage(index + 1); }}
                   >
-                    <img 
-                      src={image} 
-                      alt={`${selectedHotel.name} ${index + 1}`} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                    <img
+                      src={image}
+                      alt={`${selectedHotel.name} ${index + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   </div>
@@ -592,15 +610,15 @@ export default function HotelDetails() {
               </div>
             </div>
             <div className="flex items-center justify-between mt-4">
-              <button 
+              <button
                 className="text-blue-600 flex items-center hover:underline"
                 onClick={() => setShowGalleryModal(true)}
               >
                 <Camera className="h-5 w-5 mr-1" />
                 View all photos ({1 + selectedHotel.images.gallery.length})
               </button>
-              
-              <button 
+
+              <button
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition-colors"
                 onClick={toggleVirtualTour}
               >
@@ -630,7 +648,7 @@ export default function HotelDetails() {
                 </h2>
                 <div className="space-y-4">
                   {roomTypes.map((room) => (
-                    <div 
+                    <div
                       key={room.id}
                       className={`border ${selectedRoom === room.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'} rounded-lg p-4 hover:border-blue-300 transition-all duration-300 cursor-pointer transform hover:-translate-y-1 hover:shadow-lg`}
                       onClick={() => handleRoomSelect(room.id)}
@@ -667,8 +685,8 @@ export default function HotelDetails() {
                 </h2>
                 <div className="grid grid-cols-2 gap-4">
                   {enhancedAmenities.map((amenity, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className="flex items-center text-gray-700 p-2 hover:bg-blue-50 rounded-md transition-colors amenity-details"
                       onClick={() => handleAmenityClick(index)}
                     >
@@ -695,9 +713,9 @@ export default function HotelDetails() {
                 </h2>
                 <p className="text-gray-600 mb-4">{selectedHotel.address || selectedHotel.location}</p>
                 <div className="bg-gray-200 rounded-lg h-[300px] flex items-center justify-center relative overflow-hidden group">
-                  <img 
-                    src="https://maps.googleapis.com/maps/api/staticmap?center=Jammu+Kashmir&zoom=12&size=800x300&maptype=roadmap&markers=color:red%7C33.7782,76.5762&key=YOUR_API_KEY" 
-                    alt="Map location" 
+                  <img
+                    src="https://maps.googleapis.com/maps/api/staticmap?center=Jammu+Kashmir&zoom=12&size=800x300&maptype=roadmap&markers=color:red%7C33.7782,76.5762&key=YOUR_API_KEY"
+                    alt="Map location"
                     className="w-full h-full object-cover opacity-60"
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -713,15 +731,15 @@ export default function HotelDetails() {
               <div className="mb-8" ref={reviewsRef}>
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">Guest Reviews</h2>
-                  <button 
-                    onClick={toggleReviews} 
+                  <button
+                    onClick={toggleReviews}
                     className="text-blue-600 flex items-center text-sm hover:underline"
                   >
                     {showReviews ? "Hide reviews" : "Show all reviews"}
                     <ChevronDown className={`ml-1 h-4 w-4 transform transition-transform ${showReviews ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
-                
+
                 <div className="flex items-center mb-6">
                   <div className="bg-blue-600 text-white rounded-lg px-3 py-2 flex items-center mr-4">
                     <span className="text-xl font-bold mr-1">{selectedHotel.rating}</span>
@@ -732,25 +750,25 @@ export default function HotelDetails() {
                     <p className="text-sm text-gray-600">Based on {selectedHotel.reviewCount} reviews</p>
                   </div>
                 </div>
-                
+
                 {showReviews && (
                   <div className="space-y-6">
                     {reviews.map(review => (
                       <div key={review.id} className="border-b border-gray-200 pb-6">
                         <div className="flex items-center mb-3">
-                          <img 
-                            src={review.avatar} 
-                            alt={review.user} 
-                            className="w-10 h-10 rounded-full mr-3" 
+                          <img
+                            src={review.avatar}
+                            alt={review.user}
+                            className="w-10 h-10 rounded-full mr-3"
                           />
                           <div>
                             <p className="font-medium">{review.user}</p>
                             <div className="flex items-center">
                               <div className="flex mr-2">
                                 {[...Array(5)].map((_, i) => (
-                                  <Star 
-                                    key={i} 
-                                    className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} 
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
                                   />
                                 ))}
                               </div>
@@ -796,7 +814,7 @@ export default function HotelDetails() {
                 <div className="mb-4">
                   <div className="border border-gray-200 rounded-t-lg overflow-hidden">
                     <div className="grid grid-cols-2">
-                      <div 
+                      <div
                         className="p-4 border-r border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors date-picker"
                         onClick={() => setShowDatePicker(!showDatePicker)}
                       >
@@ -806,7 +824,7 @@ export default function HotelDetails() {
                           <span className="text-gray-800">{checkInDate}</span>
                         </div>
                       </div>
-                      <div 
+                      <div
                         className="p-4 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors date-picker"
                         onClick={() => setShowDatePicker(!showDatePicker)}
                       >
@@ -817,7 +835,7 @@ export default function HotelDetails() {
                         </div>
                       </div>
                     </div>
-                    <div 
+                    <div
                       className="p-4 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors guest-dropdown relative"
                       onClick={() => setShowGuestDropdown(!showGuestDropdown)}
                     >
@@ -829,7 +847,7 @@ export default function HotelDetails() {
                         </div>
                         <ChevronDown size={16} className={`text-gray-400 transition-transform duration-300 ${showGuestDropdown ? 'rotate-180' : ''}`} />
                       </div>
-                      
+
                       {/* Guest dropdown */}
                       {showGuestDropdown && (
                         <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
@@ -837,7 +855,7 @@ export default function HotelDetails() {
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium">Adults</span>
                               <div className="flex items-center">
-                                <button 
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleGuestChange('adults', 'decrease');
@@ -848,7 +866,7 @@ export default function HotelDetails() {
                                   -
                                 </button>
                                 <span className="mx-3 w-4 text-center">{guestCount.adults}</span>
-                                <button 
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleGuestChange('adults', 'increase');
@@ -862,7 +880,7 @@ export default function HotelDetails() {
                             <div className="flex items-center justify-between">
                               <span className="font-medium">Children</span>
                               <div className="flex items-center">
-                                <button 
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleGuestChange('children', 'decrease');
@@ -873,7 +891,7 @@ export default function HotelDetails() {
                                   -
                                 </button>
                                 <span className="mx-3 w-4 text-center">{guestCount.children}</span>
-                                <button 
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleGuestChange('children', 'increase');
@@ -885,7 +903,7 @@ export default function HotelDetails() {
                               </div>
                             </div>
                           </div>
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setShowGuestDropdown(false);
@@ -919,7 +937,7 @@ export default function HotelDetails() {
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={handleReserveNow}
                   className="w-full bg-[#0061ff] hover:bg-blue-700 text-white py-3 rounded-lg transition-colors font-medium flex items-center justify-center gap-2 group"
                 >
@@ -927,8 +945,12 @@ export default function HotelDetails() {
                   <ArrowRight size={16} className="transform transition-transform group-hover:translate-x-1" />
                 </button>
 
-                <p className="text-center text-sm text-gray-500 mt-4">
-                  You won't be charged yet
+                <p className="text-center text-sm mt-4 text-gray-500">
+                  {error ? (
+                    <span className="text-red-500">{error}</span>  // Show error in red color
+                  ) : (
+                    "You won't be charged yet"
+                  )}
                 </p>
               </div>
 
@@ -936,9 +958,9 @@ export default function HotelDetails() {
               <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                 <h4 className="font-semibold text-gray-900 mb-3">Contact Host</h4>
                 <div className="flex items-center gap-3 mb-3">
-                  <img 
-                    src="https://randomuser.me/api/portraits/men/85.jpg" 
-                    alt="Host" 
+                  <img
+                    src="https://randomuser.me/api/portraits/men/85.jpg"
+                    alt="Host"
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
@@ -965,23 +987,23 @@ export default function HotelDetails() {
       {/* Full-screen gallery modal */}
       {showGalleryModal && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-          <button 
+          <button
             onClick={() => setShowGalleryModal(false)}
             className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
           >
             <X size={24} />
           </button>
-          
+
           <button
             onClick={prevImage}
             className="absolute left-4 text-white hover:text-gray-300 transition-colors"
           >
             <ChevronLeft size={32} />
           </button>
-          
+
           <div className="max-w-4xl max-h-screen p-4">
-            <img 
-              src={activeImage === 0 ? selectedHotel.images.main : selectedHotel.images.gallery[activeImage - 1]} 
+            <img
+              src={activeImage === 0 ? selectedHotel.images.main : selectedHotel.images.gallery[activeImage - 1]}
               alt={`${selectedHotel.name} image ${activeImage + 1}`}
               className="max-h-[80vh] mx-auto"
             />
@@ -989,7 +1011,7 @@ export default function HotelDetails() {
               {activeImage + 1} / {1 + selectedHotel.images.gallery.length}
             </p>
           </div>
-          
+
           <button
             onClick={nextImage}
             className="absolute right-4 text-white hover:text-gray-300 transition-colors"
@@ -1002,18 +1024,18 @@ export default function HotelDetails() {
       {/* Virtual tour modal */}
       {showVirtualTour && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-          <button 
+          <button
             onClick={toggleVirtualTour}
             className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
           >
             <X size={24} />
           </button>
           <div className="max-w-4xl max-h-screen p-4">
-            <iframe 
-              src="https://www.youtube.com/embed/VIDEO_ID" 
-              title="Virtual Tour" 
-              frameBorder="0" 
-              allowFullScreen 
+            <iframe
+              src="https://www.youtube.com/embed/VIDEO_ID"
+              title="Virtual Tour"
+              frameBorder="0"
+              allowFullScreen
               className="w-full h-full"
             />
           </div>
@@ -1027,7 +1049,7 @@ export default function HotelDetails() {
             {/* Background decorative elements */}
             <div className="absolute -right-16 -top-16 w-32 h-32 bg-blue-100 rounded-full opacity-50"></div>
             <div className="absolute -left-16 -bottom-16 w-32 h-32 bg-blue-100 rounded-full opacity-50"></div>
-            
+
             {!callbackSubmitted ? (
               <>
                 <div className="flex justify-between items-center mb-6 relative z-10">
@@ -1035,18 +1057,18 @@ export default function HotelDetails() {
                     <Phone className="text-blue-600 mr-2 h-5 w-5" />
                     Request a Callback
                   </h3>
-                  <button 
+                  <button
                     onClick={() => setShowCallbackRequest(false)}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <X size={20} />
                   </button>
                 </div>
-                
+
                 <p className="text-gray-600 mb-4 relative z-10">
                   Leave your contact details and our representative will call you back to confirm your booking at {selectedHotel.name}.
                 </p>
-                
+
                 <form onSubmit={handleCallbackSubmit} className="relative z-10">
                   <div className="space-y-4">
                     <div>
@@ -1062,7 +1084,7 @@ export default function HotelDetails() {
                         placeholder="Enter your full name"
                       />
                     </div>
-                    
+
                     <div>
                       <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                       <div className="relative">
@@ -1079,7 +1101,7 @@ export default function HotelDetails() {
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       </div>
                     </div>
-                    
+
                     <div>
                       <label htmlFor="preferredTime" className="block text-sm font-medium text-gray-700 mb-1">Preferred Time for Callback</label>
                       <div className="relative">
@@ -1098,7 +1120,7 @@ export default function HotelDetails() {
                         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       </div>
                     </div>
-                    
+
                     <div>
                       <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">Additional Message (optional)</label>
                       <textarea
@@ -1112,7 +1134,7 @@ export default function HotelDetails() {
                       ></textarea>
                     </div>
                   </div>
-                  
+
                   <div className="mt-6">
                     <button
                       type="submit"
@@ -1123,13 +1145,13 @@ export default function HotelDetails() {
                     </button>
                   </div>
                 </form>
-                
+
                 <div className="flex items-center justify-center mt-4 space-x-4">
                   <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-6 opacity-60" />
                   <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-6 opacity-60" />
                   <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" alt="American Express" className="h-6 opacity-60" />
                 </div>
-                
+
                 <p className="text-xs text-gray-500 mt-4 text-center relative z-10">
                   By submitting this form, you agree to our <a href="#" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>.
                 </p>
@@ -1147,9 +1169,9 @@ export default function HotelDetails() {
                   <Clock size={18} />
                   <span>Processing your booking...</span>
                 </div>
-                
+
                 <div className="flex justify-center mt-4">
-                  <button 
+                  <button
                     onClick={() => {
                       setCallbackSubmitted(false);
                       setShowCallbackRequest(false);
@@ -1176,7 +1198,7 @@ export default function HotelDetails() {
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
               <p className="text-gray-600">Your reservation at {selectedHotel.name} has been successfully confirmed.</p>
             </div>
-            
+
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1203,15 +1225,15 @@ export default function HotelDetails() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => setShowBookingConfirmation(false)}
                 className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShowBookingConfirmation(false);
                   navigate("/my-trips");
@@ -1221,7 +1243,7 @@ export default function HotelDetails() {
                 View My Trips
               </button>
             </div>
-            
+
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-500">A confirmation email has been sent to your email address.</p>
               <div className="flex justify-center mt-4 space-x-4">
