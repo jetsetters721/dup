@@ -8,7 +8,6 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('Supabase client initialized');
-
 // Test the connection (this is optional but helps in debugging)
 async function testConnection() {
   try {
@@ -25,5 +24,6 @@ async function testConnection() {
 
 // Run the test
 testConnection();
-
 export default supabase;
+
+

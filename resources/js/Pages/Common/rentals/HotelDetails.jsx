@@ -4,44 +4,34 @@ import {
   Star, MapPin, Check, ChevronLeft, Heart, Share, Calendar, 
   Users, X, ChevronRight, ChevronDown, ThumbsUp, MessageCircle, 
   Award, Camera, Coffee, ArrowRight, Bookmark, Phone, Mail, Facebook, Twitter, Instagram,
-  Clock, Wifi, Tv, Shield, Utensils, Car, Sunset, Sparkles, Info, Plus, Minus, Search
+  Clock, Wifi, Tv, Shield, Utensils, Car, Sunset, Sparkles, Info
 } from "lucide-react";
-import axios from 'axios';
 import Navbar from "../Navbar";
 import Footer from "../Footer";
 import "./styles.css";
-import rentalsCallbackService from "../../../services/rentalsCallbackService";
-import { FaMapMarkerAlt, FaCalendarAlt, FaSearch, FaStar, FaArrowRight, FaChevronRight, FaAngleDown, FaUsers } from 'react-icons/fa';
-import hotelService from '../../../services/hotelService';
-
-// API base URL
-const API_BASE_URL = 'http://localhost:5001/api';
+import supabase from "../../../lib/supabase";
 
 export default function HotelDetails() {
   const navigate = useNavigate();
   const location = useLocation();
+  const hotelData = location.state?.hotelData || {};
+  const searchParams = location.state?.searchParams || {};
   
-  // Get hotel data from navigation state
-  const hotelId = location.state?.hotelId;
-  const searchParams = location.state?.searchParams;
-  
-  // State management
-  const [hotel, setHotel] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [availability, setAvailability] = useState(null);
-  const [bookingStatus, setBookingStatus] = useState(null);
+  const [selectedHotel, setSelectedHotel] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(0);
-  const [guestCount, setGuestCount] = useState({ adults: 2, children: 1 });
+  const [guestCount, setGuestCount] = useState({ 
+    adults: searchParams?.adults || 2, 
+    children: 1 
+  });
   const [showReviews, setShowReviews] = useState(false);
-  const [checkInDate, setCheckInDate] = useState(new Date());
-  const [checkOutDate, setCheckOutDate] = useState(new Date(new Date().setDate(new Date().getDate() + 1)));
+  const [checkInDate, setCheckInDate] = useState(searchParams?.checkInDate || "Jul 24, 2025");
+  const [checkOutDate, setCheckOutDate] = useState(searchParams?.checkOutDate || "Jul 28, 2025");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
-  const [activeDateInput, setActiveDateInput] = useState(null);
   const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
   const [showCallbackRequest, setShowCallbackRequest] = useState(false);
   const [callbackForm, setCallbackForm] = useState({
@@ -56,278 +46,397 @@ export default function HotelDetails() {
   const [activeTab, setActiveTab] = useState('overview');
   const [showAmenityDetails, setShowAmenityDetails] = useState(null);
   const [isPromoActive, setIsPromoActive] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [activeField, setActiveField] = useState(null);
-  const [searchValues, setSearchValues] = useState({
-    location: '',
-    date: '',
-    guests: '',
-    price: ''
-  });
-  const [destinations, setDestinations] = useState([]);
-  const [filteredDestinations, setFilteredDestinations] = useState([]);
-  const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [priceRange, setPriceRange] = useState('Any Price');
-  const [displayedMonth, setDisplayedMonth] = useState(new Date().getMonth()); 
-  const [displayedYear, setDisplayedYear] = useState(new Date().getFullYear());
   const [roomTypes, setRoomTypes] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [enhancedAmenities, setEnhancedAmenities] = useState([]);
 
-  // Refs
-  const datepickerRef = useRef(null);
   const overviewRef = useRef(null);
   const roomsRef = useRef(null);
   const amenitiesRef = useRef(null);
   const locationRef = useRef(null);
   const reviewsRef = useRef(null);
-  const searchRef = useRef(null);
 
-  // Fetch hotel details when component mounts
+  useEffect(() => {
+    if (!location.state?.hotelData) {
+      navigate('/rental');
+      return;
+    }
+  }, [location.state?.hotelData, navigate]);
+
   useEffect(() => {
     const fetchHotelDetails = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        setIsLoading(true);
         
-        if (!hotelId) {
-          throw new Error('Hotel ID not provided');
-        }
-        
-        const [hotelResponse, roomsResponse, reviewsResponse] = await Promise.all([
-          axios.get(`${API_BASE_URL}/hotels/${hotelId}`),
-          axios.get(`${API_BASE_URL}/hotels/${hotelId}/rooms`),
-          axios.get(`${API_BASE_URL}/hotels/${hotelId}/reviews`)
-        ]);
+        // Default values
+        const defaultPrice = 199;
+        const defaultRating = 4.5;
+        const basePrice = parseFloat(hotelData?.price) || defaultPrice;
+        const hotelRating = parseFloat(hotelData?.rating) || defaultRating;
 
-        if (hotelResponse.data.success) {
-          setHotel(hotelResponse.data.data);
-        } else {
-          throw new Error(hotelResponse.data.message || 'Failed to fetch hotel details');
-        }
+        const mockRoomTypes = [
+          { 
+            id: 0, 
+            name: "Deluxe Room", 
+            price: basePrice, 
+            capacity: 2, 
+            features: ["Mountain View", "King Bed", "Free WiFi"] 
+          },
+          { 
+            id: 1, 
+            name: "Premium Suite", 
+            price: basePrice * 1.5, 
+            capacity: 3, 
+            features: ["Lake View", "King Bed + Sofa Bed", "Free WiFi", "Jacuzzi"] 
+          },
+          { 
+            id: 2, 
+            name: "Family Suite", 
+            price: basePrice * 2, 
+            capacity: 4, 
+            features: ["Mountain View", "2 Queen Beds", "Free WiFi", "Kitchenette"] 
+          }
+        ];
 
-        if (roomsResponse.data.success) {
-          setRoomTypes(roomsResponse.data.data);
-        }
+        const mockReviews = [
+          { 
+            id: 1, 
+            user: "Sarah J.", 
+            avatar: "https://randomuser.me/api/portraits/women/12.jpg", 
+            rating: hotelRating, 
+            date: "June 2023", 
+            comment: "The hotel exceeded our expectations. Views were breathtaking and staff was very attentive to our needs." 
+          },
+          { 
+            id: 2, 
+            user: "Michael T.", 
+            avatar: "https://randomuser.me/api/portraits/men/32.jpg", 
+            rating: hotelRating, 
+            date: "May 2023", 
+            comment: "Perfect for our family vacation! Great amenities and close to all the local attractions." 
+          },
+          { 
+            id: 3, 
+            user: "Emily P.", 
+            avatar: "https://randomuser.me/api/portraits/women/44.jpg", 
+            rating: hotelRating, 
+            date: "April 2023", 
+            comment: "Beautiful room with amazing views. Only small issue was slow WiFi, but otherwise perfect." 
+          }
+        ];
 
-        if (reviewsResponse.data.success) {
-          setReviews(reviewsResponse.data.data);
-        }
+        const mockAmenities = [
+          { 
+            icon: <Wifi className="h-5 w-5" />, 
+            name: "High-Speed WiFi", 
+            description: "Complimentary high-speed internet access throughout the property with speeds up to 100 Mbps."
+          },
+          { 
+            icon: <Coffee className="h-5 w-5" />, 
+            name: "Gourmet Breakfast", 
+            description: "Daily complimentary breakfast buffet featuring local and international cuisine from 7:00 AM to 10:30 AM."
+          },
+          { 
+            icon: <Tv className="h-5 w-5" />, 
+            name: "Smart Entertainment", 
+            description: "55-inch smart TV with premium streaming services including Netflix, Amazon Prime, and local channels."
+          },
+          { 
+            icon: <Shield className="h-5 w-5" />, 
+            name: "24/7 Security", 
+            description: "Round-the-clock security with CCTV surveillance and secure key card access to all areas."
+          },
+          { 
+            icon: <Utensils className="h-5 w-5" />, 
+            name: "Fine Dining", 
+            description: "On-site restaurant offering authentic local cuisine and international dishes prepared by our award-winning chef."
+          },
+          { 
+            icon: <Car className="h-5 w-5" />, 
+            name: "Free Parking", 
+            description: "Complimentary valet and self-parking available for all guests throughout their stay."
+          },
+          { 
+            icon: <Sunset className="h-5 w-5" />, 
+            name: "Scenic Views", 
+            description: "Rooms featuring panoramic views of the surrounding mountains and valleys."
+          },
+          { 
+            icon: <Clock className="h-5 w-5" />, 
+            name: "Flexible Check-in", 
+            description: "Early check-in and late check-out available upon request, subject to availability."
+          }
+        ];
 
-        // Check initial availability
-        await checkAvailability();
-      } catch (err) {
-        setError(err.message || 'Failed to load hotel details');
-        console.error('Error fetching hotel details:', err);
-      } finally {
-        setLoading(false);
+        setRoomTypes(mockRoomTypes);
+        setReviews(mockReviews);
+        setEnhancedAmenities(mockAmenities);
+
+        setSelectedHotel({
+          ...hotelData,
+          longDescription: hotelData.description || 'Experience luxury and comfort at our hotel.',
+          address: hotelData.location || 'Address not available',
+          reviewCount: 128,
+          amenities: hotelData.amenities || ['WiFi', 'Room Service', 'Restaurant']
+        });
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching hotel details:', error);
+        setIsLoading(false);
       }
     };
 
-    fetchHotelDetails();
-  }, [hotelId]);
+    if (location.state?.hotelData) {
+      fetchHotelDetails();
+    }
+  }, [location.state?.hotelData, hotelData]);
 
-  // Check hotel availability when dates or guests change
-  const checkAvailability = async () => {
-    if (!hotelId || !checkInDate || !checkOutDate) return;
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.scrollY);
+      
+      // Determine which section is currently in view
+      const scrollPos = window.scrollY + 100;
+      
+      if (overviewRef.current && scrollPos >= overviewRef.current.offsetTop && 
+          scrollPos < (roomsRef.current?.offsetTop || Infinity)) {
+        setActiveTab('overview');
+      } else if (roomsRef.current && scrollPos >= roomsRef.current.offsetTop && 
+                scrollPos < (amenitiesRef.current?.offsetTop || Infinity)) {
+        setActiveTab('rooms');
+      } else if (amenitiesRef.current && scrollPos >= amenitiesRef.current.offsetTop && 
+                scrollPos < (locationRef.current?.offsetTop || Infinity)) {
+        setActiveTab('amenities');
+      } else if (locationRef.current && scrollPos >= locationRef.current.offsetTop && 
+                scrollPos < (reviewsRef.current?.offsetTop || Infinity)) {
+        setActiveTab('location');
+      } else if (reviewsRef.current && scrollPos >= reviewsRef.current.offsetTop) {
+        setActiveTab('reviews');
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-    try {
-      setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/hotels/${hotelId}/availability`, {
-        params: {
-          checkInDate: checkInDate.toISOString().split('T')[0],
-          checkOutDate: checkOutDate.toISOString().split('T')[0],
-          adults: guestCount.adults,
-          children: guestCount.children
+  useEffect(() => {
+    // 50% chance to show a special promo
+    setIsPromoActive(Math.random() > 0.5);
+    
+    // Add animation classes to elements when they come into view
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate-fadeIn');
         }
       });
+    }, { threshold: 0.1 });
+    
+    document.querySelectorAll('.animate-on-scroll').forEach(el => {
+      observer.observe(el);
+    });
+    
+    return () => {
+      document.querySelectorAll('.animate-on-scroll').forEach(el => {
+        observer.unobserve(el);
+      });
+    };
+  }, []);
 
-      if (response.data.success) {
-        setAvailability(response.data.data);
-      } else {
-        throw new Error(response.data.message || 'Failed to check availability');
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showGuestDropdown && !event.target.closest('.guest-dropdown')) {
+        setShowGuestDropdown(false);
       }
-    } catch (err) {
-      console.error('Error checking availability:', err);
-      setError(err.message || 'Failed to check availability');
-    } finally {
-      setLoading(false);
+      if (showDatePicker && !event.target.closest('.date-picker')) {
+        setShowDatePicker(false);
+      }
+      if (showAmenityDetails && !event.target.closest('.amenity-details')) {
+        setShowAmenityDetails(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showGuestDropdown, showDatePicker, showAmenityDetails]);
+
+  const handleBack = () => {
+    navigate("/rental");
+  };
+
+  const toggleFavorite = () => {
+    setIsFavorite(!isFavorite);
+  };
+
+  const handleShare = () => {
+    // Mock share functionality
+    alert("Share feature would open native share dialog here");
+  };
+
+  const nextImage = () => {
+    if (showGalleryModal) {
+      setActiveImage((prev) => 
+        prev === selectedHotel.images.gallery.length ? 0 : prev + 1
+      );
     }
   };
 
-  // Handle booking submission
-  const handleBookNow = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await axios.post(`${API_BASE_URL}/hotels/${hotelId}/book`, {
-        checkInDate: checkInDate.toISOString().split('T')[0],
-        checkOutDate: checkOutDate.toISOString().split('T')[0],
-        guests: guestCount,
-        roomType: roomTypes[selectedRoom]?.name,
-        payment: {
-          method: 'creditCard',
-          cardNumber: '4111111111111111',
-          expiryDate: '12/25',
-          cvv: '123'
-        }
-      });
-
-      if (response.data.success) {
-        setBookingStatus(response.data.data);
-        setShowBookingConfirmation(true);
-      } else {
-        throw new Error(response.data.message || 'Booking failed');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to complete booking');
-      console.error('Booking error:', err);
-    } finally {
-      setLoading(false);
+  const prevImage = () => {
+    if (showGalleryModal) {
+      setActiveImage((prev) => 
+        prev === 0 ? selectedHotel.images.gallery.length : prev - 1
+      );
     }
   };
 
-  // Handle callback request submission
+  const handleRoomSelect = (id) => {
+    setSelectedRoom(id);
+  };
+
+  const toggleReviews = () => {
+    setShowReviews(!showReviews);
+  };
+
+  const handleGuestChange = (type, action) => {
+    if (type === 'adults') {
+      if (action === 'increase') {
+        setGuestCount((prev) => ({ ...prev, adults: prev.adults + 1 }));
+      } else if (action === 'decrease' && guestCount.adults > 1) {
+        setGuestCount((prev) => ({ ...prev, adults: prev.adults - 1 }));
+      }
+    } else if (type === 'children') {
+      if (action === 'increase') {
+        setGuestCount((prev) => ({ ...prev, children: prev.children + 1 }));
+      } else if (action === 'decrease' && guestCount.children > 0) {
+        setGuestCount((prev) => ({ ...prev, children: prev.children - 1 }));
+      }
+    }
+  };
+
+  const handleReserveNow = () => {
+    setShowCallbackRequest(true);
+  };
+
+  const handleCallbackFormChange = (e) => {
+    const { name, value } = e.target;
+    setCallbackForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleCallbackSubmit = async (e) => {
     e.preventDefault();
     
     try {
-      setLoading(true);
-      setError(null);
+      // Store the callback request in Supabase
+      const { data, error } = await supabase
+        .from('hotels_callback')
+        .insert([
+          {
+            name: callbackForm.name,
+            phone: callbackForm.phone,
+            preferred_time: callbackForm.preferredTime,
+            message: callbackForm.message || ''  // Make message optional
+          }
+        ]);
 
-      const response = await axios.post(`${API_BASE_URL}/hotels/${hotelId}/callback`, {
-        ...callbackForm,
-        hotelId,
-        checkInDate: checkInDate.toISOString().split('T')[0],
-        checkOutDate: checkOutDate.toISOString().split('T')[0],
-        guests: guestCount
-      });
-
-      if (response.data.success) {
-        setCallbackSubmitted(true);
-        setTimeout(() => {
-          setShowCallbackRequest(false);
-          setShowBookingConfirmation(true);
-        }, 3000);
-      } else {
-        throw new Error(response.data.message || 'Callback request failed');
+      if (error) {
+        console.error('Error storing callback request:', error);
+        alert('There was an error submitting your request. Please try again.');
+        return;
       }
-    } catch (err) {
-      setError(err.message || 'Failed to submit callback request');
-      console.error('Callback error:', err);
-    } finally {
-      setLoading(false);
+
+      // Send confirmation email
+      try {
+        const baseUrl = import.meta.env.PROD 
+          ? window.location.origin 
+          : 'http://localhost:5001';
+        
+        const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            name: callbackForm.name,
+            phone: callbackForm.phone,
+            email: `${callbackForm.phone.replace(/\D/g, '')}@example.com`, // Generate email from phone
+            type: 'rental',
+            details: {
+              hotelName: selectedHotel.name,
+              preferredTime: callbackForm.preferredTime,
+              message: callbackForm.message,
+              checkIn: checkInDate,
+              checkOut: checkOutDate,
+              guests: `${guestCount.adults} adults, ${guestCount.children} children`,
+              roomType: roomTypes[selectedRoom].name,
+              totalPrice: totalPrice
+            }
+          })
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Email confirmation issue:', await emailResponse.text());
+        } else {
+          console.log('Email sent successfully:', await emailResponse.json());
+        }
+      } catch (emailError) {
+        console.error('Error sending confirmation email:', emailError);
+        // Continue despite email error - we don't want to fail the callback submission
+      }
+
+      console.log('Callback request stored successfully:', data);
+      setCallbackSubmitted(true);
+      
+      // After 3 seconds, show the booking confirmation
+      setTimeout(() => {
+        setCallbackSubmitted(false);
+        setShowCallbackRequest(false);
+        setShowBookingConfirmation(true);
+      }, 3000);
+    } catch (error) {
+      console.error('Error in callback submission:', error);
+      alert('There was an error submitting your request. Please try again.');
     }
   };
 
-  // Handle date changes
-  const handleDateChange = (date, type) => {
-    if (type === 'checkin') {
-      setCheckInDate(date);
-      // Ensure check-out date is after check-in date
-      if (checkOutDate <= date) {
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
-        setCheckOutDate(nextDay);
-      }
-    } else {
-      setCheckOutDate(date);
-    }
-    setShowDatePicker(false);
-    checkAvailability();
+  const toggleVirtualTour = () => {
+    setShowVirtualTour(!showVirtualTour);
   };
 
-  // Handle guest count changes
-  const handleGuestChange = (type, action) => {
-    setGuestCount(prev => {
-      const newCount = { ...prev };
-      if (action === 'increment') {
-        newCount[type] = type === 'adults' ? Math.min(prev[type] + 1, 10) : Math.min(prev[type] + 1, 5);
-      } else {
-        newCount[type] = type === 'adults' ? Math.max(prev[type] - 1, 1) : Math.max(prev[type] - 1, 0);
-      }
-      return newCount;
-    });
-    checkAvailability();
+  const handleAmenityClick = (index) => {
+    setShowAmenityDetails(showAmenityDetails === index ? null : index);
   };
 
-  // Handle room selection
-  const handleRoomSelect = (roomId) => {
-    setSelectedRoom(roomId);
-  };
-
-  // Handle favorite toggle
-  const toggleFavorite = async () => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/hotels/${hotelId}/favorite`, {
-        isFavorite: !isFavorite
-      });
-
-      if (response.data.success) {
-        setIsFavorite(!isFavorite);
-      }
-    } catch (err) {
-      console.error('Error toggling favorite:', err);
+  const scrollToSection = (sectionRef) => {
+    if (sectionRef.current) {
+      sectionRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  // Handle share
-  const handleShare = async () => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/hotels/${hotelId}/share`);
-      if (response.data.success) {
-        // Handle share success (e.g., show success message)
-        alert('Share link copied to clipboard!');
-      }
-    } catch (err) {
-      console.error('Error sharing:', err);
-    }
-  };
-
-  // Handle virtual tour
-  const toggleVirtualTour = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/hotels/${hotelId}/virtual-tour`);
-      if (response.data.success) {
-        setShowVirtualTour(!showVirtualTour);
-      }
-    } catch (err) {
-      console.error('Error loading virtual tour:', err);
-    }
-  };
-
-  // Handle back navigation
-  const handleBack = () => {
-    if (searchParams) {
-      navigate("/rentals/search", { state: { searchParams } });
-    } else {
-      navigate("/rentals");
-    }
-  };
-
-  // Loading state
-  if (loading && !hotel) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading hotel details...</p>
+        </div>
       </div>
     );
   }
 
-  // Error state
-  if (error && !hotel) {
+  if (!selectedHotel) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md px-4">
           <div className="text-red-500 text-5xl mb-4">😕</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Hotel</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Hotel Not Found</h2>
+          <p className="text-gray-600 mb-6">We couldn't find the hotel you're looking for. It may have been removed or you may have followed an incorrect link.</p>
           <button 
             onClick={handleBack}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
+            className="bg-[#0061ff] hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
           >
             Back to Rentals
           </button>
@@ -336,142 +445,39 @@ export default function HotelDetails() {
     );
   }
 
-  // Calculate total price
-  const totalNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-  const roomPrice = roomTypes[selectedRoom]?.price || 0;
-  const totalPrice = (roomPrice * totalNights) + 50 + 30; // Room price + cleaning fee + service fee
-
-  // ... rest of your existing JSX code ...
+  const currentRoomPrice = roomTypes[selectedRoom].price;
+  const totalNights = 4;
+  const totalPrice = currentRoomPrice * totalNights + 50 + 30;
 
   return (
     <>
       <Navbar />
       <div className="min-h-screen bg-white pb-16 pt-16">
-        {/* Back to Rental Section */}
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <button
+        {/* Back button */}
+        <div className="px-4 py-3 bg-white shadow-sm">
+          <button 
             onClick={handleBack}
-            className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+            className="flex items-center text-gray-600 hover:text-[#0061ff] transition-colors"
           >
-            <FaArrowRight className="transform rotate-180 mr-2" />
-            Back to Rental
+            <ChevronLeft size={20} className="mr-1" />
+            <span>Back to Rentals</span>
           </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="bg-white shadow-md">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Location Search */}
-              <div className="relative">
-                <div className="flex items-center border rounded-lg p-2">
-                  <MapPin className="text-gray-400 mr-2" size={20} />
-                  <input
-                    type="text"
-                    placeholder="Where are you going?"
-                    className="w-full outline-none"
-                    value={searchValues.location}
-                    onChange={(e) => setSearchValues(prev => ({ ...prev, location: e.target.value }))}
-                    onFocus={() => handleFocus('location')}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                {activeField === 'location' && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
-                    <div className="p-2">
-                      <input
-                        type="text"
-                        placeholder="Search destinations..."
-                        className="w-full p-2 border rounded"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {filteredDestinations.map((destination, index) => (
-                        <div
-                          key={index}
-                          className="p-2 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => handleQuickSelect(destination, 'location')}
-                        >
-                          {destination}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Date Picker */}
-              <div className="relative">
-                <div className="flex items-center border rounded-lg p-2">
-                  <Calendar className="text-gray-400 mr-2" size={20} />
-                  <input
-                    type="text"
-                    placeholder="Check-in - Check-out"
-                    className="w-full outline-none"
-                    value={searchValues.date}
-                    onChange={(e) => setSearchValues(prev => ({ ...prev, date: e.target.value }))}
-                    onFocus={() => handleFocus('date')}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                {activeField === 'date' && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg p-4">
-                    <div className="flex justify-between mb-4">
-                      <button onClick={() => setDisplayedMonth(prev => prev - 1)}>Previous</button>
-                      <span>{availableMonths[displayedMonth]} {displayedYear}</span>
-                      <button onClick={() => setDisplayedMonth(prev => prev + 1)}>Next</button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-2">
-                      {/* Calendar days will be generated here */}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Guests */}
-              <div className="relative">
-                <div className="flex items-center border rounded-lg p-2">
-                  <FaUsers className="text-gray-400 mr-2" size={20} />
-                  <input
-                    type="text"
-                    placeholder="Guests"
-                    className="w-full outline-none"
-                    value={searchValues.guests}
-                    onChange={(e) => setSearchValues(prev => ({ ...prev, guests: e.target.value }))}
-                    onFocus={() => handleFocus('guests')}
-                    onBlur={handleBlur}
-                  />
-                </div>
-              </div>
-
-              {/* Search Button */}
-              <button
-                type="submit"
-                className="bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center hover:bg-blue-700 transition-colors"
-              >
-                <FaSearch className="mr-2" />
-                Search
-              </button>
-            </form>
-          </div>
         </div>
 
         {/* Main content */}
         <div className="max-w-6xl mx-auto px-4 mt-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{hotel.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedHotel.name}</h1>
               <div className="flex items-center text-gray-600 mb-1">
                 <MapPin size={16} className="mr-1" />
-                <span>{hotel.location}</span>
+                <span>{selectedHotel.location}</span>
               </div>
               <div className="flex items-center">
                 <div className="flex items-center">
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                  <span className="ml-1 text-gray-700 font-medium">{hotel.rating}</span>
-                  <span className="ml-1 text-gray-500">({hotel.reviewCount} reviews)</span>
+                  <span className="ml-1 text-gray-700 font-medium">{selectedHotel.rating}</span>
+                  <span className="ml-1 text-gray-500">({selectedHotel.reviewCount} reviews)</span>
                   <button 
                     onClick={toggleReviews}
                     className="ml-2 text-blue-600 text-sm hover:underline"
@@ -480,14 +486,6 @@ export default function HotelDetails() {
                   </button>
                 </div>
               </div>
-              {/* Add Book Now Button */}
-              <button
-                onClick={handleReserveNow}
-                className="mt-4 bg-[#0061ff] hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors flex items-center gap-2"
-              >
-                Book Now
-                <ArrowRight size={18} />
-              </button>
             </div>
 
             <div className="flex gap-2">
@@ -515,8 +513,8 @@ export default function HotelDetails() {
                 onClick={() => {setShowGalleryModal(true); setActiveImage(0);}}
               >
                 <img 
-                  src={hotel.images.main} 
-                  alt={hotel.name} 
+                  src={selectedHotel.images.main} 
+                  alt={selectedHotel.name} 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                 />
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -532,7 +530,7 @@ export default function HotelDetails() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                {hotel.images.gallery.map((image, index) => (
+                {selectedHotel.images.gallery.map((image, index) => (
                   <div 
                     key={index} 
                     className="rounded-lg overflow-hidden h-[140px] md:h-[192px] cursor-pointer relative group"
@@ -540,7 +538,7 @@ export default function HotelDetails() {
                   >
                     <img 
                       src={image} 
-                      alt={`${hotel.name} ${index + 1}`} 
+                      alt={`${selectedHotel.name} ${index + 1}`} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -554,7 +552,7 @@ export default function HotelDetails() {
                 onClick={() => setShowGalleryModal(true)}
               >
                 <Camera className="h-5 w-5 mr-1" />
-                View all photos ({1 + hotel.images.gallery.length})
+                View all photos ({1 + selectedHotel.images.gallery.length})
               </button>
               
               <button 
@@ -575,8 +573,8 @@ export default function HotelDetails() {
                   <Award className="mr-2 text-blue-600 h-6 w-6" />
                   About this hotel
                 </h2>
-                <p className="text-gray-600 mb-4">{hotel.description}</p>
-                <p className="text-gray-600">{hotel.longDescription}</p>
+                <p className="text-gray-600 mb-4">{selectedHotel.description}</p>
+                <p className="text-gray-600">{selectedHotel.longDescription}</p>
               </div>
 
               {/* Room selection section */}
@@ -650,7 +648,7 @@ export default function HotelDetails() {
                   <MapPin className="mr-2 text-blue-600 h-6 w-6" />
                   Location
                 </h2>
-                <p className="text-gray-600 mb-4">{hotel.address || hotel.location}</p>
+                <p className="text-gray-600 mb-4">{selectedHotel.address || selectedHotel.location}</p>
                 <div className="bg-gray-200 rounded-lg h-[300px] flex items-center justify-center relative overflow-hidden group">
                   <img 
                     src="https://maps.googleapis.com/maps/api/staticmap?center=Jammu+Kashmir&zoom=12&size=800x300&maptype=roadmap&markers=color:red%7C33.7782,76.5762&key=YOUR_API_KEY" 
@@ -681,12 +679,12 @@ export default function HotelDetails() {
                 
                 <div className="flex items-center mb-6">
                   <div className="bg-blue-600 text-white rounded-lg px-3 py-2 flex items-center mr-4">
-                    <span className="text-xl font-bold mr-1">{hotel.rating}</span>
+                    <span className="text-xl font-bold mr-1">{selectedHotel.rating}</span>
                     <Star className="h-5 w-5 fill-white" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">Excellent</p>
-                    <p className="text-sm text-gray-600">Based on {hotel.reviewCount} reviews</p>
+                    <p className="text-sm text-gray-600">Based on {selectedHotel.reviewCount} reviews</p>
                   </div>
                 </div>
                 
@@ -728,7 +726,7 @@ export default function HotelDetails() {
                         </div>
                       </div>
                     ))}
-                    <button className="bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition-colors">
+                    <button className="bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded hover:bg-blue-50 transition-colors">
                       Show more reviews
                     </button>
                   </div>
@@ -741,147 +739,39 @@ export default function HotelDetails() {
               <div id="booking-card" className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-24 transition-all duration-300 hover:shadow-xl">
                 <div className="flex items-baseline justify-between mb-4">
                   <div>
-                    <span className="text-2xl font-bold text-gray-900">${roomPrice}</span>
+                    <span className="text-2xl font-bold text-gray-900">${currentRoomPrice}</span>
                     <span className="text-gray-600 ml-1">per night</span>
                   </div>
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                    <span className="ml-1 text-gray-700">{hotel.rating}</span>
+                    <span className="ml-1 text-gray-700">{selectedHotel.rating}</span>
                   </div>
                 </div>
 
                 <div className="mb-4">
                   <div className="border border-gray-200 rounded-t-lg overflow-hidden">
-                    <div className="grid grid-cols-2 divide-x divide-gray-200">
+                    <div className="grid grid-cols-2">
                       <div 
-                        className="p-4 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => {
-                          setActiveDateInput('checkin');
-                          setShowDatePicker(true);
-                          setShowGuestDropdown(false);
-                        }}
+                        className="p-4 border-r border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors date-picker"
+                        onClick={() => setShowDatePicker(!showDatePicker)}
                       >
-                        <p className="text-xs text-gray-500 mb-1">CHECK-IN</p>
+                        <label className="block text-xs text-gray-500 mb-1">CHECK-IN</label>
                         <div className="flex items-center">
-                          <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                          <span>{formatDate(checkInDate)}</span>
+                          <Calendar size={16} className="text-gray-400 mr-2" />
+                          <span className="text-gray-800">{checkInDate}</span>
                         </div>
                       </div>
                       <div 
-                        className="p-4 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => {
-                          setActiveDateInput('checkout');
-                          setShowDatePicker(true);
-                          setShowGuestDropdown(false);
-                        }}
+                        className="p-4 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors date-picker"
+                        onClick={() => setShowDatePicker(!showDatePicker)}
                       >
-                        <p className="text-xs text-gray-500 mb-1">CHECK-OUT</p>
+                        <label className="block text-xs text-gray-500 mb-1">CHECK-OUT</label>
                         <div className="flex items-center">
-                          <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                          <span>{formatDate(checkOutDate)}</span>
+                          <Calendar size={16} className="text-gray-400 mr-2" />
+                          <span className="text-gray-800">{checkOutDate}</span>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Date Picker Popup */}
-                    {showDatePicker && (
-                      <div 
-                        ref={datepickerRef}
-                        className="absolute left-0 right-0 top-[100px] bg-white border border-gray-200 rounded-xl shadow-xl z-20 p-4 mt-2"
-                      >
-                        <div className="flex justify-between items-center mb-4">
-                          <button 
-                            onClick={previousMonth}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                            type="button"
-                          >
-                            <ChevronLeft className="h-5 w-5 text-gray-600" />
-                          </button>
-                          <h3 className="font-medium">{months[displayedMonth]} {displayedYear}</h3>
-                          <button 
-                            onClick={nextMonth}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                            type="button"
-                          >
-                            <ChevronRight className="h-5 w-5 text-gray-600" />
-                          </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-500 mb-2">
-                          <div>Su</div>
-                          <div>Mo</div>
-                          <div>Tu</div>
-                          <div>We</div>
-                          <div>Th</div>
-                          <div>Fr</div>
-                          <div>Sa</div>
-                        </div>
-                        
-                        <div className="grid grid-cols-7 gap-1">
-                          {generateCalendarDays().map((day, index) => {
-                            const date = day !== null ? new Date(displayedYear, displayedMonth, day) : null;
-                            const isToday = date && new Date().toDateString() === date.toDateString();
-                            const isSelected = 
-                              date && 
-                              ((activeDateInput === 'checkin' && checkInDate.toDateString() === date.toDateString()) ||
-                               (activeDateInput === 'checkout' && checkOutDate.toDateString() === date.toDateString()));
-                            const isDisabled = date && (
-                              date < new Date().setHours(0, 0, 0, 0) || 
-                              (activeDateInput === 'checkout' && date <= checkInDate)
-                            );
-                            
-                            return (
-                              <div 
-                                key={index}
-                                onClick={() => {
-                                  if (day !== null && !isDisabled) {
-                                    const newDate = new Date(displayedYear, displayedMonth, day);
-                                    if (activeDateInput === 'checkin') {
-                                      setCheckInDate(newDate);
-                                      if (newDate >= checkOutDate) {
-                                        // If new check-in date is after current check-out date,
-                                        // set check-out to the next day
-                                        setCheckOutDate(new Date(newDate.getTime() + 86400000)); 
-                                      }
-                                      setActiveDateInput('checkout');
-                                    } else {
-                                      setCheckOutDate(newDate);
-                                      setShowDatePicker(false);
-                                    }
-                                  }
-                                }}
-                                className={`
-                                  h-10 w-full flex items-center justify-center rounded-full text-sm
-                                  ${day === null ? 'cursor-default' : isDisabled ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'}
-                                  ${isToday ? 'border border-gray-300' : ''}
-                                  ${isSelected ? 'bg-[#0061ff] text-white hover:bg-blue-700' : ''}
-                                `}
-                              >
-                                {day}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        
-                        <div className="mt-4 flex justify-between">
-                          <button 
-                            onClick={() => setShowDatePicker(false)}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                          <button 
-                            onClick={() => setShowDatePicker(false)}
-                            className="px-4 py-2 bg-[#0061ff] text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                            type="button"
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
                     <div 
                       className="p-4 border-b border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors guest-dropdown relative"
                       onClick={() => setShowGuestDropdown(!showGuestDropdown)}
@@ -905,7 +795,7 @@ export default function HotelDetails() {
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleGuestChange('adults', 'decrement');
+                                    handleGuestChange('adults', 'decrease');
                                   }}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
                                   disabled={guestCount.adults <= 1}
@@ -916,7 +806,7 @@ export default function HotelDetails() {
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleGuestChange('adults', 'increment');
+                                    handleGuestChange('adults', 'increase');
                                   }}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
                                 >
@@ -930,7 +820,7 @@ export default function HotelDetails() {
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleGuestChange('children', 'decrement');
+                                    handleGuestChange('children', 'decrease');
                                   }}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
                                   disabled={guestCount.children <= 0}
@@ -941,7 +831,7 @@ export default function HotelDetails() {
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleGuestChange('children', 'increment');
+                                    handleGuestChange('children', 'increase');
                                   }}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
                                 >
@@ -967,8 +857,8 @@ export default function HotelDetails() {
 
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-gray-700">${roomPrice} x {Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))} nights</span>
-                    <span className="text-gray-700">${roomPrice * Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))}</span>
+                    <span className="text-gray-700">${currentRoomPrice} x {totalNights} nights</span>
+                    <span className="text-gray-700">${currentRoomPrice * totalNights}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-700">Cleaning fee</span>
@@ -985,7 +875,7 @@ export default function HotelDetails() {
                 </div>
 
                 <button 
-                  onClick={handleBookNow}
+                  onClick={handleReserveNow}
                   className="w-full bg-[#0061ff] hover:bg-blue-700 text-white py-3 rounded-lg transition-colors font-medium flex items-center justify-center gap-2 group"
                 >
                   <span>Reserve Now</span>
@@ -1046,12 +936,12 @@ export default function HotelDetails() {
           
           <div className="max-w-4xl max-h-screen p-4">
             <img 
-              src={activeImage === 0 ? hotel.images.main : hotel.images.gallery[activeImage - 1]} 
-              alt={`${hotel.name} image ${activeImage + 1}`}
+              src={activeImage === 0 ? selectedHotel.images.main : selectedHotel.images.gallery[activeImage - 1]} 
+              alt={`${selectedHotel.name} image ${activeImage + 1}`}
               className="max-h-[80vh] mx-auto"
             />
             <p className="text-white text-center mt-4">
-              {activeImage + 1} / {1 + hotel.images.gallery.length}
+              {activeImage + 1} / {1 + selectedHotel.images.gallery.length}
             </p>
           </div>
           
@@ -1109,7 +999,7 @@ export default function HotelDetails() {
                 </div>
                 
                 <p className="text-gray-600 mb-4 relative z-10">
-                  Leave your contact details and our representative will call you back to confirm your booking at {hotel.name}.
+                  Leave your contact details and our representative will call you back to confirm your booking at {selectedHotel.name}.
                 </p>
                 
                 <form onSubmit={handleCallbackSubmit} className="relative z-10">
@@ -1239,18 +1129,18 @@ export default function HotelDetails() {
                 <Check className="h-8 w-8 text-green-600" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-              <p className="text-gray-600">Your reservation at {hotel.name} has been successfully confirmed.</p>
+              <p className="text-gray-600">Your reservation at {selectedHotel.name} has been successfully confirmed.</p>
             </div>
             
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">CHECK-IN</p>
-                  <p className="font-medium">{formatDate(checkInDate)}</p>
+                  <p className="font-medium">{checkInDate}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">CHECK-OUT</p>
-                  <p className="font-medium">{formatDate(checkOutDate)}</p>
+                  <p className="font-medium">{checkOutDate}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">GUESTS</p>
@@ -1258,7 +1148,7 @@ export default function HotelDetails() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">ROOM TYPE</p>
-                  <p className="font-medium">{roomTypes[selectedRoom]?.name}</p>
+                  <p className="font-medium">{roomTypes[selectedRoom].name}</p>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-200">
@@ -1308,4 +1198,4 @@ export default function HotelDetails() {
       <Footer />
     </>
   );
-}
+} 
