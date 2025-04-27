@@ -28,8 +28,24 @@ export default function HotelDetails() {
     children: 1 
   });
   const [showReviews, setShowReviews] = useState(false);
-  const [checkInDate, setCheckInDate] = useState(searchParams?.checkInDate || "Jul 24, 2025");
-  const [checkOutDate, setCheckOutDate] = useState(searchParams?.checkOutDate || "Jul 28, 2025");
+  const [checkInDate, setCheckInDate] = useState(() => {
+    // Ensure checkInDate is a string
+    if (searchParams?.checkInDate) {
+      return typeof searchParams.checkInDate === 'string' 
+        ? searchParams.checkInDate 
+        : searchParams.checkInDate.toString();
+    }
+    return "Jul 24, 2025";
+  });
+  const [checkOutDate, setCheckOutDate] = useState(() => {
+    // Ensure checkOutDate is a string
+    if (searchParams?.checkOutDate) {
+      return typeof searchParams.checkOutDate === 'string' 
+        ? searchParams.checkOutDate 
+        : searchParams.checkOutDate.toString();
+    }
+    return "Jul 28, 2025";
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
   const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
@@ -172,12 +188,37 @@ export default function HotelDetails() {
         setReviews(mockReviews);
         setEnhancedAmenities(mockAmenities);
 
+        // Ensure images property always exists with default values if missing
+        const defaultImagePlaceholder = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80';
+
+        // High-quality hotel images from Unsplash
+        const defaultGalleryImages = [
+          // Hotel Rooms
+          'https://images.unsplash.com/photo-1582719508461-905c673771fd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1600&q=80',
+          'https://images.unsplash.com/photo-1618773928121-c33d57733427?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+          
+          // Hotel Bathroom
+          'https://images.unsplash.com/photo-1590490360182-c33d57733427?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80',
+          
+          // Hotel Views/Pool
+          'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+          
+          // Additional room views
+          'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+          'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'
+        ];
+
+        // Create hotel object with guaranteed image properties
         setSelectedHotel({
           ...hotelData,
           longDescription: hotelData.description || 'Experience luxury and comfort at our hotel.',
           address: hotelData.location || 'Address not available',
           reviewCount: 128,
-          amenities: hotelData.amenities || ['WiFi', 'Room Service', 'Restaurant']
+          amenities: hotelData.amenities || ['WiFi', 'Room Service', 'Restaurant'],
+          images: {
+            main: hotelData.images?.main || defaultImagePlaceholder,
+            gallery: hotelData.images?.gallery || defaultGalleryImages
+          }
         });
 
         setIsLoading(false);
@@ -354,6 +395,10 @@ export default function HotelDetails() {
           ? window.location.origin 
           : 'http://localhost:5001';
         
+        // Convert any potential Date objects to strings
+        const checkInString = typeof checkInDate === 'string' ? checkInDate : String(checkInDate);
+        const checkOutString = typeof checkOutDate === 'string' ? checkOutDate : String(checkOutDate);
+        
         const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
           method: 'POST',
           headers: {
@@ -368,8 +413,8 @@ export default function HotelDetails() {
               hotelName: selectedHotel.name,
               preferredTime: callbackForm.preferredTime,
               message: callbackForm.message,
-              checkIn: checkInDate,
-              checkOut: checkOutDate,
+              checkIn: checkInString,
+              checkOut: checkOutString,
               guests: `${guestCount.adults} adults, ${guestCount.children} children`,
               roomType: roomTypes[selectedRoom].name,
               totalPrice: totalPrice

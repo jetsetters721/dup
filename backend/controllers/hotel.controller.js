@@ -29,8 +29,8 @@ const getAccessToken = async () => {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         auth: {
-          username: 'YuGXhM4V1ZXx1K1tpRNDYSa1VCQAGGZf',    // Make sure this is set in your .env
-          password: 'NMhnya69yWkjO8IY'   // Make sure this is set in your .env
+          username: 'a9Gz1aJ5Noo7sOvTb11TJ8bwF3jyaAjX',    // Make sure this is set in your .env
+          password: 'nw6Gz0x0NusJ9uu3'   // Make sure this is set in your .env
         }
       }
     );
