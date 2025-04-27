@@ -371,7 +371,7 @@ export default function HotelDetails() {
       console.log(response, 'dddddddddddddddddddd')
     } catch (error) {
       console.error('Error fetching hotels:', error.response?.data?.message);
-
+      setShowCallbackRequest(true);
       // Set a user-friendly error message
       setError(error.response?.data?.message || "Error fetching hotels");
     }
